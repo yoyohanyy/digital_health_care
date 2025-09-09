@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:percent_indicator/percent_indicator.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:table_calendar/table_calendar.dart';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -31,11 +33,7 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _selectedIndex = 1; // Start with 리포트 page
 
-  final List<Widget> _pages = const [
-    Center(child: Text("홈 페이지", style: TextStyle(color: Colors.white))),
-    ReportPage(),
-    Center(child: Text("마이 페이지", style: TextStyle(color: Colors.white))),
-  ];
+  final List<Widget> _pages = const [HomePage(), ReportPage(), MyPage()];
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +41,7 @@ class _MainPageState extends State<MainPage> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         backgroundColor: const Color(0xFF1A202C),
-        selectedItemColor: Color(0xFFAEC6CF),
+        selectedItemColor: const Color(0xFFAEC6CF),
         unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
         onTap: (index) {
@@ -57,6 +55,213 @@ class _MainPageState extends State<MainPage> {
           BottomNavigationBarItem(icon: Icon(Icons.person), label: "마이"),
         ],
       ),
+    );
+  }
+}
+
+class MyPage extends StatelessWidget {
+  const MyPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1A202C),
+        title: const Text("마이 페이지"),
+        centerTitle: false,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Profile Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                border: Border.all(color: Colors.white24),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: const [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.grey,
+                    child: Icon(Icons.person, size: 40, color: Colors.white),
+                  ),
+                  SizedBox(width: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "이동은",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        "wp4106@naver.com",
+                        style: TextStyle(color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Options
+            _menuTile("건강 데이터 연동하기"),
+            _menuTile("카카오 챗봇 연결하기"),
+            _menuTile("알림 설정?"),
+            _menuTile("앱 정보"),
+            _menuTile("약관 및 정책"),
+            _menuTile("로그아웃"),
+            _menuTile("탈퇴하기", isDestructive: true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _menuTile(String text, {bool isDestructive = false}) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        title: Text(
+          text,
+          style: TextStyle(
+            color: isDestructive ? Colors.red : Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+        onTap: () {
+          // TODO: add navigation or actions
+        },
+      ),
+    );
+  }
+}
+
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  late Timer _timer;
+  Duration _timeLeft = const Duration(hours: 9, minutes: 20, seconds: 11);
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setState(() {
+        if (_timeLeft.inSeconds > 0) {
+          _timeLeft -= const Duration(seconds: 1);
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String _formatDuration(Duration d) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    return "${twoDigits(d.inHours)}:${twoDigits(d.inMinutes % 60)}:${twoDigits(d.inSeconds % 60)}";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("홈"),
+        backgroundColor: const Color(0xFF1A202C),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            const Text("안녕하세요 동은님!", style: TextStyle(fontSize: 20)),
+            const SizedBox(height: 20),
+
+            _infoCard([
+              const Text("오늘 동은님의 추천 취침 시간은", style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 10),
+              const Text(
+                "오후 12시 00분",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              const Text("수면 시작 까지"),
+              const SizedBox(height: 10),
+              Text(
+                _formatDuration(_timeLeft),
+                style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text("설정 기상 시간 : 오전 8시 00분"),
+              const SizedBox(height: 5),
+              TextButton(onPressed: () {}, child: const Text("수정하기")),
+            ]),
+
+            const SizedBox(height: 20),
+
+            _infoCard([
+              const Text("동은님의 오늘 총 수면 시간은"),
+              const SizedBox(height: 10),
+              const Text(
+                "총 5시간 53분",
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 5),
+              const Text("어제보다 1시간 3분 적어요!"),
+            ]),
+
+            const SizedBox(height: 20),
+
+            _infoCard([
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text("어제의 내가 오늘의 나에게"),
+                  Icon(Icons.chevron_right, color: Colors.white54),
+                ],
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoCard(List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white24),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(children: children),
     );
   }
 }
@@ -301,7 +506,7 @@ class _ReportPageState extends State<ReportPage>
           const SizedBox(height: 20),
           _infoCard([
             _infoRow("평균 수면 시간", "5h 30m"),
-            _infoRow("가장 긴 수면", "1:07 AM - 8:00 AM"),
+            _infoRow("가장 긴 수면", "1:07 AM - 8:30 AM"),
             _infoRow("가장 짧은 수면", "3:07 AM - 9:00 AM"),
             _infoRow("평균 수면 만족도", "보통"),
           ]),
@@ -330,8 +535,81 @@ class _ReportPageState extends State<ReportPage>
 
   // ---------------- Monthly Report ----------------
   Widget _buildMonthlyReport() {
-    return const Center(
-      child: Text("월간 리포트", style: TextStyle(color: Colors.white)),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          TableCalendar(
+            focusedDay: DateTime(2025, 9, 1),
+            firstDay: DateTime(2020),
+            lastDay: DateTime(2030),
+            calendarFormat: CalendarFormat.month,
+            startingDayOfWeek: StartingDayOfWeek.sunday,
+            headerStyle: const HeaderStyle(
+              formatButtonVisible: false,
+              titleCentered: true,
+              titleTextStyle: TextStyle(color: Colors.white),
+              leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
+              rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
+            ),
+            daysOfWeekStyle: const DaysOfWeekStyle(
+              weekdayStyle: TextStyle(color: Colors.white70),
+              weekendStyle: TextStyle(color: Colors.white70),
+            ),
+            calendarStyle: const CalendarStyle(
+              todayDecoration: BoxDecoration(
+                color: Color(0xFFAEC6CF),
+                shape: BoxShape.circle,
+              ),
+              defaultTextStyle: TextStyle(color: Colors.white),
+              weekendTextStyle: TextStyle(color: Colors.white70),
+            ),
+            calendarBuilders: CalendarBuilders(
+              defaultBuilder: (context, day, focusedDay) {
+                if (day.day == 1) {
+                  return Center(
+                    child: Text(
+                      "1\nbad",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
+                    ),
+                  );
+                }
+                if (day.day == 2) {
+                  return Center(
+                    child: Text(
+                      "2\ngood",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.greenAccent, fontSize: 12),
+                    ),
+                  );
+                }
+                if (day.day == 3) {
+                  return Center(
+                    child: Text(
+                      "3\nnormal",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  );
+                }
+                return null;
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          _infoCard([
+            _infoRow("평균 수면 시간", "5h 30m"),
+            _infoRow("가장 긴 수면", "1:07 AM - 8:30 AM"),
+            _infoRow("가장 짧은 수면", "3:07 AM - 9:00 AM"),
+            _infoRow("평균 수면 만족도", "보통"),
+          ]),
+          const SizedBox(height: 10),
+          _infoCard([
+            const Text("월간 피드백", style: TextStyle(fontSize: 16)),
+          ], height: 80),
+        ],
+      ),
     );
   }
 
