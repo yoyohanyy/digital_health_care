@@ -3,6 +3,8 @@ import 'package:percent_indicator/percent_indicator.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'dart:async';
+import 'package:health/health.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(const MyApp());
@@ -277,10 +279,72 @@ class _ReportPageState extends State<ReportPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  Health health = Health();
+  String _sleepDataString = "데이터 없음";
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _fetchSleepData();
+  }
+
+  /// Health Connect로부터 수면 데이터를 가져오는 함수
+  Future<void> _fetchSleepData() async {
+    final types = [HealthDataType.SLEEP_SESSION];
+
+    print("👉 권한 요청 시작");
+    bool requested = await health.requestAuthorization(types);
+    print("✅ 권한 요청 결과: $requested");
+
+    if (requested) {
+      try {
+        DateTime now = DateTime.now();
+        DateTime yesterday = now.subtract(const Duration(days: 1));
+
+        print("👉 데이터 요청: $yesterday ~ $now");
+
+        List<HealthDataPoint> healthData = await health.getHealthDataFromTypes(
+          startTime: yesterday,
+          endTime: now,
+          types: types,
+        );
+
+        print("✅ 가져온 데이터 개수: ${healthData.length}");
+
+        if (healthData.isNotEmpty) {
+          final latestSleep = healthData.firstWhere(
+            (data) => data.type == HealthDataType.SLEEP_SESSION,
+            orElse: () => healthData.first,
+          );
+
+          print("✅ 최신 수면 데이터: ${latestSleep.dateFrom} ~ ${latestSleep.dateTo}");
+
+          final DateFormat formatter = DateFormat('h:mm a');
+          final String startTime = formatter.format(latestSleep.dateFrom);
+          final String endTime = formatter.format(latestSleep.dateTo);
+
+          setState(() {
+            _sleepDataString = "$startTime - $endTime";
+          });
+        } else {
+          print("⚠️ 수면 데이터 없음");
+          setState(() {
+            _sleepDataString = "기록된 수면 데이터가 없습니다.";
+          });
+        }
+      } catch (error) {
+        print("❌ 수면 데이터 가져오기 실패: $error");
+        setState(() {
+          _sleepDataString = "데이터 로딩 실패";
+        });
+      }
+    } else {
+      print("❌ 권한 요청이 거부됨 (Health Connect 설정 확인 필요)");
+      setState(() {
+        _sleepDataString = "권한 없음";
+      });
+    }
   }
 
   @override
@@ -381,7 +445,7 @@ class _ReportPageState extends State<ReportPage>
           // Info Card
           _infoCard([
             _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
-            _infoRow("실제 수면 시간", "1:07 AM - 8:00 AM"),
+            _infoRow("실제 수면 시간", _sleepDataString),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
 
