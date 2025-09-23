@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+    <string>수면 데이터를 가져오기 위해 접근 권한이 필요합니다.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+    <string>수면 데이터를 저장하기 위해 접근 권한이 필요합니다.</string>
 </dict>
 </plist>
