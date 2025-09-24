@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:health_care_app/page/mainPage.dart';
 import './services/healthService.dart';
 import 'package:firebase_core/firebase_core.dart';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
@@ -39,9 +40,11 @@ class _MyAppState extends State<MyApp> {
       _permissionGranted = sdkAvailable;
     });
 
-    debugPrint(sdkAvailable
-        ? 'Health Connect 권한 및 SDK 사용 가능'
-        : 'Health Connect 권한 거부 또는 SDK 미설치');
+    debugPrint(
+      sdkAvailable
+          ? 'Health Connect 권한 및 SDK 사용 가능'
+          : 'Health Connect 권한 거부 또는 SDK 미설치',
+    );
   }
 
   @override
