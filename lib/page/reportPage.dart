@@ -5,6 +5,7 @@ import 'package:health/health.dart';
 import 'package:intl/intl.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../services/healthService.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -16,7 +17,7 @@ class ReportPage extends StatefulWidget {
 class _ReportPageState extends State<ReportPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
+  final HealthService _healthService = HealthService();
   Health health = Health();
   String _sleepDataString = "데이터 없음";
 
@@ -27,8 +28,39 @@ class _ReportPageState extends State<ReportPage>
     _fetchSleepData();
   }
 
+  Future<void> _fetchSleepData() async {
+    // 권한 요청
+    await _healthService.authorize();
+
+    // 수면 데이터 가져오기
+    List<HealthDataPoint> sleepData = await _healthService.getSleepData();
+
+    // 수면 세션만 합산 (단위: 분)
+    int totalMinutes = 0;
+    for (var point in sleepData) {
+      if (point.type == HealthDataType.SLEEP_SESSION) {
+        final start = point.dateFrom.toLocal();
+        final end = point.dateTo.toLocal();
+        final duration = end.difference(start).inMinutes;
+        totalMinutes += duration;
+      }
+    }
+
+    // 시간 + 분 변환
+    int hours = totalMinutes ~/ 60;
+    int minutes = totalMinutes % 60;
+
+    setState(() {
+      if (minutes == 0) {
+        _sleepDataString = "${hours}시간";
+      } else {
+        _sleepDataString = "${hours}시간 ${minutes}분";
+      }
+    });
+  }
+
   /// Health Connect로부터 수면 데이터를 가져오는 함수
-  Future<List<HealthDataPoint>> _fetchSleepData() async {
+  /*Future<List<HealthDataPoint>> _fetchSleepData() async {
     final types = [HealthDataType.SLEEP_SESSION];
     final permissions = [HealthDataAccess.READ];
 
@@ -88,7 +120,7 @@ class _ReportPageState extends State<ReportPage>
       return [];
     }
   }
-
+*/
   @override
   void dispose() {
     _tabController.dispose();
