@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/healthService.dart';
+import '../services/firebaseService.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -18,47 +19,59 @@ class _ReportPageState extends State<ReportPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final HealthService _healthService = HealthService();
+  final FirebaseService _firebaseService = FirebaseService();
   Health health = Health();
   String _sleepDataString = "데이터 없음";
-
+  double _totalHours = 0.0;           // 총 수면 시간 (시간 단위)
+  DateTime? _sleepStartTime;          // 수면 시작 시간
+  DateTime? _sleepEndTime;            // 수면 종료 시간
+  double _deepSleep = 0.0;
+  Map<DateTime, double> _weeklySleep = {}; // 0~6: 주간 수면 시간
+  bool _isLoading = true; // 데이터 로딩 상태
+  DateTime weekStart = DateTime.now().subtract(Duration(days: 6));
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _fetchSleepData();
+    _loadSleepData();
+    _loadWeeklySleep();
   }
 
-  Future<void> _fetchSleepData() async {
-    // 권한 요청
-    await _healthService.authorize();
+  Future<void> _loadSleepData() async {
+    final sleepInfo = await _healthService.fetchDailySleepData();
 
-    // 수면 데이터 가져오기
-    List<HealthDataPoint> sleepData = await _healthService.getSleepData();
-
-    // 수면 세션만 합산 (단위: 분)
-    int totalMinutes = 0;
-    for (var point in sleepData) {
-      if (point.type == HealthDataType.SLEEP_SESSION) {
-        final start = point.dateFrom.toLocal();
-        final end = point.dateTo.toLocal();
-        final duration = end.difference(start).inMinutes;
-        totalMinutes += duration;
-      }
-    }
-
-    // 시간 + 분 변환
-    int hours = totalMinutes ~/ 60;
-    int minutes = totalMinutes % 60;
 
     setState(() {
-      if (minutes == 0) {
-        _sleepDataString = "${hours}시간";
-      } else {
-        _sleepDataString = "${hours}시간 ${minutes}분";
-      }
+      _sleepDataString = sleepInfo['sleepString'] ?? "데이터 없음";
+      _totalHours = sleepInfo['totalHours'];
+      _sleepStartTime = sleepInfo['startTime'];
+      _sleepEndTime = sleepInfo['endTime'];
+      _deepSleep = sleepInfo['deepSleep'];
     });
   }
-
+  Future<void> _loadWeeklySleep() async {
+    final firebaseService = FirebaseService();
+    final data = await firebaseService.getWeeklySleepFromFirestore("test_user_123");
+    print("📊 주간 수면 데이터: $data"); // 🔹 디버깅용 출력
+    setState(() {
+      _weeklySleep = data;
+      _isLoading = false;
+    });
+  }
+  Future<void> _saveSleepData() async {
+    if (_sleepStartTime != null && _sleepEndTime != null) {
+      await _firebaseService.saveSleepData(
+        userId: "test_user_123", // 실제 로그인 UID
+        startTime: _sleepStartTime!,
+        endTime: _sleepEndTime!,
+        totalHours: _totalHours,
+        deepSleep: _deepSleep,
+        sleepEfficiency: 81, // 예시값, 실제 계산 로직 필요
+      );
+    } else {
+      print("⚠️ 수면 데이터가 준비되지 않았습니다.");
+    }
+  }
   /// Health Connect로부터 수면 데이터를 가져오는 함수
   /*Future<List<HealthDataPoint>> _fetchSleepData() async {
     final types = [HealthDataType.SLEEP_SESSION];
@@ -242,6 +255,11 @@ class _ReportPageState extends State<ReportPage>
               ],
             ),
           ], height: 60),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: _saveSleepData,
+            child: const Text("저장", style: TextStyle(fontSize: 16)),
+          ),
         ],
       ),
     );
@@ -260,7 +278,9 @@ class _ReportPageState extends State<ReportPage>
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: BarChart(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                :BarChart(
               BarChartData(
                 gridData: FlGridData(show: false),
                 titlesData: FlTitlesData(
@@ -313,11 +333,10 @@ class _ReportPageState extends State<ReportPage>
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, _) {
-                        const days = ["토", "일", "월", "화", "수", "목", "금"];
-                        return Text(
-                          days[value.toInt()],
-                          style: const TextStyle(color: Colors.white70),
-                        );
+                        int index = value.toInt();
+                        DateTime date = weekStart.add(Duration(days: index));
+                        String label = DateFormat.E().format(date); // 요일 표시 (Mon, Tue …)
+                        return Text(label, style: const TextStyle(color: Colors.white70));
                       },
                     ),
                   ),
@@ -329,15 +348,11 @@ class _ReportPageState extends State<ReportPage>
                   ),
                 ),
                 borderData: FlBorderData(show: false),
-                barGroups: [
-                  _barData(0, 1.2),
-                  _barData(1, 3.5),
-                  _barData(2, 7.5),
-                  _barData(3, 2.5, highlighted: true),
-                  _barData(4, 5.0),
-                  _barData(5, 3.5),
-                  _barData(6, 2.8),
-                ],
+                barGroups:  List.generate(7, (i) {
+                  DateTime date = weekStart.add(Duration(days: i));
+                  double sleepHours = _weeklySleep[date] ?? 0.0;
+                  return _barData(i, sleepHours);
+                }),
               ),
             ),
           ),
