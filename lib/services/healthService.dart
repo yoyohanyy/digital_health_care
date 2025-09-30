@@ -79,7 +79,7 @@ class HealthService {
     }
   }
 
-  /// 수면 데이터 가져오기 (default: 어제~오늘)
+  /// 건강 데이터 가져오기 (default: 어제~오늘)
   Future<List<HealthDataPoint>> getSleepData(
       {DateTime? start, DateTime? end}) async {
     start ??= DateTime.now().subtract(const Duration(days: 1));
@@ -95,5 +95,47 @@ class HealthService {
       debugPrint('수면 데이터 가져오기 실패: $e');
       return [];
     }
+  }
+  /// 하루 전체 수면 시간 문자열과 총 수면 정보를 반환
+  Future<Map<String, dynamic>> fetchDailySleepData() async {
+    await authorize(); // 권한 요청
+
+    // 수면 데이터 가져오기
+    List<HealthDataPoint> sleepData = await getSleepData();
+
+    int totalMinutes = 0;
+    DateTime? firstStart;
+    DateTime? lastEnd;
+    double deepSleep = 0;
+
+    for (var point in sleepData) {
+      if (point.type == HealthDataType.SLEEP_SESSION) {
+        final start = point.dateFrom.toLocal();
+        final end = point.dateTo.toLocal();
+        final duration = end.difference(start).inMinutes;
+        totalMinutes += duration;
+
+        if (firstStart == null || start.isBefore(firstStart)) firstStart = start;
+        if (lastEnd == null || end.isAfter(lastEnd)) lastEnd = end;
+      }
+
+      if (point.type == HealthDataType.SLEEP_DEEP) {
+        deepSleep += (point.value is num ? (point.value as num).toDouble() : 0.0);
+      }
+    }
+
+    int hours = totalMinutes ~/ 60;
+    int minutes = totalMinutes % 60;
+
+    String sleepString = minutes == 0 ? "$hours시간" : "$hours시간 $minutes분";
+
+    return {
+      'sleepString': sleepString,
+      'totalMinutes': totalMinutes,
+      'totalHours': totalMinutes / 60.0,
+      'startTime': firstStart,
+      'endTime': lastEnd,
+      'deepSleep': deepSleep,
+    };
   }
 }

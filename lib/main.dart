@@ -4,8 +4,14 @@ import 'package:health_care_app/page/mainPage.dart';
 import './services/healthService.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp();
+    print("✅ Firebase 초기화 성공");
+  } catch (e) {
+    print("❌ Firebase 초기화 실패: $e");
+  }
   runApp(const MyApp());
 }
 
