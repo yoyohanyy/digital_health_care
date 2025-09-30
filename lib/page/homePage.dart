@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'letterPage.dart';
 
 // HomePage는 기존 코드에서 수정된 부분만 확인하시면 됩니다.
 class HomePage extends StatefulWidget {
@@ -159,15 +160,30 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(height: 20),
 
-            _infoCard([
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text("어제의 내가 오늘의 나에게", style: TextStyle(color: Colors.white)),
-                  Icon(Icons.chevron_right, color: Colors.white54),
-                ],
-              ),
-            ]),
+            InkWell(
+              onTap: () {
+                // LetterPage로 화면을 전환합니다.
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LetterPage()),
+                );
+              },
+              // 터치 시 배경이 어두워지는 효과를 없애기 위함
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              child: _infoCard([
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const [
+                    Text(
+                      "어제의 내가 오늘의 나에게",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    Icon(Icons.chevron_right, color: Colors.white54),
+                  ],
+                ),
+              ]),
+            ),
           ],
         ),
       ),
@@ -307,7 +323,7 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
                       padding: const EdgeInsets.symmetric(horizontal: 4.0),
                       child: ActionChip(
                         label: Text(_formatTime(time)),
-                        backgroundColor: Colors.white12,
+                        backgroundColor: const Color(0xFF2D3748),
                         labelStyle: const TextStyle(color: Colors.white),
                         onPressed: () {
                           setState(() {
@@ -334,23 +350,24 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
                   ),
                   const Text(
                     "설정 취침 시간에 알림 받기",
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: Colors.white, fontSize: 10),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    widget.onSave(_wakeUpTime, _bedTime);
-                    Navigator.pop(context); // 시트 닫기
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: const Text("저장하기"),
+              ElevatedButton(
+                onPressed: () {
+                  widget.onSave(_wakeUpTime, _bedTime);
+                  Navigator.pop(context); // 시트 닫기
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2D3748),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  elevation: 0, // 그림자 제거
+                ),
+                child: const Text(
+                  "저장하기",
+                  style: TextStyle(color: Colors.white, fontSize: 14),
                 ),
               ),
             ],
