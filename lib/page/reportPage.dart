@@ -1,5 +1,4 @@
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:health/health.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +7,14 @@ import 'package:table_calendar/table_calendar.dart';
 import '../services/healthService.dart';
 
 class ReportPage extends StatefulWidget {
-  const ReportPage({super.key});
+  final TimeOfDay wakeUpTime;
+  final TimeOfDay bedTime;
+
+  const ReportPage({
+    super.key,
+    required this.wakeUpTime,
+    required this.bedTime,
+  });
 
   @override
   State<ReportPage> createState() => _ReportPageState();
@@ -18,8 +24,8 @@ class _ReportPageState extends State<ReportPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final HealthService _healthService = HealthService();
-  Health health = Health();
   String _sleepDataString = "데이터 없음";
+  int _actualSleepMinutes = 0; // 실제 수면 시간 (분)
 
   @override
   void initState() {
@@ -29,102 +35,39 @@ class _ReportPageState extends State<ReportPage>
   }
 
   Future<void> _fetchSleepData() async {
-    // 권한 요청
     await _healthService.authorize();
-
-    // 수면 데이터 가져오기
     List<HealthDataPoint> sleepData = await _healthService.getSleepData();
-
-    // 수면 세션만 합산 (단위: 분)
     int totalMinutes = 0;
     for (var point in sleepData) {
       if (point.type == HealthDataType.SLEEP_SESSION) {
-        final start = point.dateFrom.toLocal();
-        final end = point.dateTo.toLocal();
-        final duration = end.difference(start).inMinutes;
+        final duration = point.dateTo.difference(point.dateFrom).inMinutes;
         totalMinutes += duration;
       }
     }
-
-    // 시간 + 분 변환
     int hours = totalMinutes ~/ 60;
     int minutes = totalMinutes % 60;
-
-    setState(() {
-      if (minutes == 0) {
-        _sleepDataString = "${hours}시간";
-      } else {
-        _sleepDataString = "${hours}시간 ${minutes}분";
-      }
-    });
-  }
-
-  /// Health Connect로부터 수면 데이터를 가져오는 함수
-  /*Future<List<HealthDataPoint>> _fetchSleepData() async {
-    final types = [HealthDataType.SLEEP_SESSION];
-    final permissions = [HealthDataAccess.READ];
-
-    print("👉 권한 요청 시작");
-    bool requested = await health.requestAuthorization(types, permissions: permissions);
-    print("✅ 권한 요청 결과: $requested");
-
-    if (!requested) {
-      print("❌ 권한 요청 거부됨 (Health Connect/HealthKit 확인 필요)");
+    if (mounted) {
       setState(() {
-        _sleepDataString = "권한 없음";
+        if (minutes == 0) {
+          _actualSleepMinutes = totalMinutes;
+          _sleepDataString = "${hours}시간";
+        } else {
+          _sleepDataString = "${hours}시간 ${minutes}분";
+        }
       });
-      return [];
-    }
-
-    try {
-      DateTime now = DateTime.now();
-      DateTime yesterday = now.subtract(const Duration(days: 1));
-
-      print("👉 데이터 요청: $yesterday ~ $now");
-
-      List<HealthDataPoint> healthData = await health.getHealthDataFromTypes(
-        startTime: yesterday,
-        endTime: now,
-        types: types,
-      );
-
-      print("✅ 가져온 데이터 개수: ${healthData.length}");
-
-      if (healthData.isNotEmpty) {
-        // 최신 데이터 순으로 정렬
-        healthData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
-        final latestSleep = healthData.first;
-
-        print("✅ 최신 수면 데이터: ${latestSleep.dateFrom} ~ ${latestSleep.dateTo}");
-
-        final DateFormat formatter = DateFormat('h:mm a');
-        final String startTime = formatter.format(latestSleep.dateFrom);
-        final String endTime = formatter.format(latestSleep.dateTo);
-
-        setState(() {
-          _sleepDataString = "$startTime - $endTime";
-        });
-      } else {
-        print("⚠️ 수면 데이터 없음");
-        setState(() {
-          _sleepDataString = "기록된 수면 데이터가 없습니다.";
-        });
-      }
-
-      return healthData;
-    } catch (error) {
-      print("❌ 수면 데이터 가져오기 실패: $error");
-      setState(() {
-        _sleepDataString = "데이터 로딩 실패";
-      });
-      return [];
     }
   }
-*/
+
   @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  String _formatTimeOfDay(TimeOfDay tod) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+    return DateFormat('a h:mm', 'ko_KR').format(dt);
   }
 
   @override
@@ -153,16 +96,56 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  // ---------------- Daily Report ----------------
   Widget _buildDailyReport() {
+    final bedTimeString = _formatTimeOfDay(widget.bedTime);
+    final wakeUpTimeString = _formatTimeOfDay(widget.wakeUpTime);
+    final targetSleepTimeString = '$bedTimeString - $wakeUpTimeString';
+
+    // 2. 목표 수면 시간을 분 단위로 계산
+    final now = DateTime.now();
+    DateTime bedDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      widget.bedTime.hour,
+      widget.bedTime.minute,
+    );
+    DateTime wakeUpDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      widget.wakeUpTime.hour,
+      widget.wakeUpTime.minute,
+    );
+
+    // 취침 시간이 기상 시간보다 늦은 경우 (예: 오후 11시 취침, 오전 7시 기상)
+    // 기상 시간을 다음 날로 처리
+    if (wakeUpDateTime.isBefore(bedDateTime)) {
+      wakeUpDateTime = wakeUpDateTime.add(const Duration(days: 1));
+    }
+    // 목표 수면 시간(분)
+    final double targetSleepMinutes =
+        wakeUpDateTime.difference(bedDateTime).inMinutes.toDouble();
+
+    // 3. 달성률(%) 계산
+    double percent = 0.0;
+    // 목표 수면 시간이 0보다 클 때만 계산 (0으로 나누기 방지)
+    if (targetSleepMinutes > 0) {
+      percent = _actualSleepMinutes / targetSleepMinutes;
+    }
+    // NaN(Not a Number) 이나 음수가 되는 경우를 방지
+    if (percent.isNaN || percent.isNegative) {
+      percent = 0.0;
+    }
+    // 화면에 표시할 퍼센트 값 (반올림)
+    final int displayPercent = (percent * 100).round();
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 20),
-
-          // Date Row (simple mockup)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -184,10 +167,7 @@ class _ReportPageState extends State<ReportPage>
               const Icon(Icons.chevron_right, color: Colors.white54),
             ],
           ),
-
           const SizedBox(height: 30),
-
-          // Title
           const Text(
             "수면 성취",
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -197,42 +177,30 @@ class _ReportPageState extends State<ReportPage>
             "목표 수면 대비 실제 수면 비율",
             style: TextStyle(color: Colors.white54),
           ),
-
           const SizedBox(height: 30),
-
-          // Circular Progress
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
-            percent: 0.76,
-            center: const Text(
-              "76%",
+            percent: percent > 1.0 ? 1.0 : percent,
+            center: Text(
+              "$displayPercent%",
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            progressColor: Color(0xFFAEC6CF),
+            progressColor: const Color(0xFFAEC6CF),
             backgroundColor: Colors.white24,
             circularStrokeCap: CircularStrokeCap.round,
           ),
-
           const SizedBox(height: 40),
-
-          // Info Card
           _infoCard([
-            _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
+            _infoRow("목표 수면 시간", targetSleepTimeString),
             _infoRow("실제 수면 시간", _sleepDataString),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
-
           const SizedBox(height: 20),
-
-          // Daily Feedback Box
           _infoCard([
             const Text("일간 피드백", style: TextStyle(fontSize: 16)),
           ], height: 80),
-
           const SizedBox(height: 20),
-
-          // Time Capsule Box
           _infoCard([
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -247,7 +215,6 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  // ---------------- Weekly Report ----------------
   Widget _buildWeeklyReport() {
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -269,37 +236,10 @@ class _ReportPageState extends State<ReportPage>
                       showTitles: true,
                       reservedSize: 40,
                       getTitlesWidget: (value, _) {
-                        if (value == 0) {
-                          return const Text(
-                            "0h",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          );
-                        }
-                        if (value == 2.5) {
-                          return const Text(
-                            "2h30m",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          );
-                        }
-                        if (value == 5) {
-                          return const Text(
-                            "5h",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          );
-                        }
-                        if (value == 7.5) {
-                          return const Text(
-                            "7h30m",
-                            style: TextStyle(
+                        if (value % 2.5 == 0) {
+                          return Text(
+                            "${value.toInt()}h",
+                            style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),
@@ -363,7 +303,7 @@ class _ReportPageState extends State<ReportPage>
       barRods: [
         BarChartRodData(
           toY: y,
-          color: highlighted ? Color(0xFFAEC6CF) : Colors.grey[600],
+          color: highlighted ? const Color(0xFFAEC6CF) : Colors.grey[600],
           width: 18,
           borderRadius: BorderRadius.circular(6),
         ),
@@ -371,7 +311,6 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  // ---------------- Monthly Report ----------------
   Widget _buildMonthlyReport() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -402,38 +341,6 @@ class _ReportPageState extends State<ReportPage>
               defaultTextStyle: TextStyle(color: Colors.white),
               weekendTextStyle: TextStyle(color: Colors.white70),
             ),
-            calendarBuilders: CalendarBuilders(
-              defaultBuilder: (context, day, focusedDay) {
-                if (day.day == 1) {
-                  return Center(
-                    child: Text(
-                      "1\nbad",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
-                    ),
-                  );
-                }
-                if (day.day == 2) {
-                  return Center(
-                    child: Text(
-                      "2\ngood",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 12),
-                    ),
-                  );
-                }
-                if (day.day == 3) {
-                  return Center(
-                    child: Text(
-                      "3\nnormal",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  );
-                }
-                return null;
-              },
-            ),
           ),
           const SizedBox(height: 20),
           _infoCard([
@@ -451,7 +358,6 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  // ---------------- UI Helpers ----------------
   Widget _infoCard(List<Widget> children, {double? height}) {
     return Container(
       width: double.infinity,

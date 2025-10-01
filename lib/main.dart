@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:health_care_app/page/mainPage.dart';
 import './services/healthService.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('ko_KR', null);
   runApp(const MyApp());
 }
 
@@ -54,7 +56,7 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF1A202C),
       ),
-      home: const MainPage(),
+      home: MainPage(),
     );
   }
 }
