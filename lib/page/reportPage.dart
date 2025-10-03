@@ -48,16 +48,29 @@ class _ReportPageState extends State<ReportPage>
       _sleepEndTime = sleepInfo['endTime'];
       _deepSleep = sleepInfo['deepSleep'];
     });
+    // ---------------- DB 저장 ----------------
+    if (_sleepStartTime != null && _sleepEndTime != null) {
+      await _firebaseService.newsaveSleepData(
+        "test_user_123",  // 실제 로그인한 userId로 교체
+        {
+          'startTime': _sleepStartTime,
+          'endTime': _sleepEndTime,
+          'totalMinutes': _totalHours * 60,
+          'deepSleep': _deepSleep,
+        },
+      );
+    }
   }
   Future<void> _loadWeeklySleep() async {
     final firebaseService = FirebaseService();
-    final data = await firebaseService.getWeeklySleepFromFirestore("test_user_123");
+    final data = await firebaseService.getWeeklySleep("test_user_123");
     print("📊 주간 수면 데이터: $data"); // 🔹 디버깅용 출력
     setState(() {
       _weeklySleep = data;
       _isLoading = false;
     });
   }
+
   Future<void> _saveSleepData() async {
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveSleepData(
@@ -66,74 +79,17 @@ class _ReportPageState extends State<ReportPage>
         endTime: _sleepEndTime!,
         totalHours: _totalHours,
         deepSleep: _deepSleep,
-        sleepEfficiency: 81, // 예시값, 실제 계산 로직 필요
+        satisfaction: 81,
+        date: '',
+        feedback: '',
+        createdAt: null,
+        updatedAt: null, // 예시값, 실제 계산 로직 필요
       );
     } else {
       print("⚠️ 수면 데이터가 준비되지 않았습니다.");
     }
   }
-  /// Health Connect로부터 수면 데이터를 가져오는 함수
-  /*Future<List<HealthDataPoint>> _fetchSleepData() async {
-    final types = [HealthDataType.SLEEP_SESSION];
-    final permissions = [HealthDataAccess.READ];
 
-    print("👉 권한 요청 시작");
-    bool requested = await health.requestAuthorization(types, permissions: permissions);
-    print("✅ 권한 요청 결과: $requested");
-
-    if (!requested) {
-      print("❌ 권한 요청 거부됨 (Health Connect/HealthKit 확인 필요)");
-      setState(() {
-        _sleepDataString = "권한 없음";
-      });
-      return [];
-    }
-
-    try {
-      DateTime now = DateTime.now();
-      DateTime yesterday = now.subtract(const Duration(days: 1));
-
-      print("👉 데이터 요청: $yesterday ~ $now");
-
-      List<HealthDataPoint> healthData = await health.getHealthDataFromTypes(
-        startTime: yesterday,
-        endTime: now,
-        types: types,
-      );
-
-      print("✅ 가져온 데이터 개수: ${healthData.length}");
-
-      if (healthData.isNotEmpty) {
-        // 최신 데이터 순으로 정렬
-        healthData.sort((a, b) => b.dateFrom.compareTo(a.dateFrom));
-        final latestSleep = healthData.first;
-
-        print("✅ 최신 수면 데이터: ${latestSleep.dateFrom} ~ ${latestSleep.dateTo}");
-
-        final DateFormat formatter = DateFormat('h:mm a');
-        final String startTime = formatter.format(latestSleep.dateFrom);
-        final String endTime = formatter.format(latestSleep.dateTo);
-
-        setState(() {
-          _sleepDataString = "$startTime - $endTime";
-        });
-      } else {
-        print("⚠️ 수면 데이터 없음");
-        setState(() {
-          _sleepDataString = "기록된 수면 데이터가 없습니다.";
-        });
-      }
-
-      return healthData;
-    } catch (error) {
-      print("❌ 수면 데이터 가져오기 실패: $error");
-      setState(() {
-        _sleepDataString = "데이터 로딩 실패";
-      });
-      return [];
-    }
-  }
-*/
   @override
   void dispose() {
     _tabController.dispose();

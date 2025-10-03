@@ -31,7 +31,14 @@
                     android:scheme="health-connect"
                     android:host="permissions" />
             </intent-filter>
-
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="kakao89d79c3a05dd0411019c1f7785ea4939"
+                    android:host="oauth"/>
+            </intent-filter>
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
@@ -44,6 +51,19 @@
 
             <intent-filter>
                 <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity"
+            android:exported="true">
+            <intent-filter android:label="flutter_web_auth">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- "kakao${YOUR_NATIVE_APP_KEY}://oauth" 형식의 앱 실행 스킴 설정 -->
+                <!-- 카카오 로그인 리다이렉트 URI -->
+                <data android:scheme="kakao89d79c3a05dd0411019c1f7785ea4939" android:host="oauth"/>
             </intent-filter>
         </activity>
         <activity-alias
@@ -59,6 +79,9 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <meta-data
+            android:name="com.kakao.sdk.AppKey"
+            android:value="89d79c3a05dd0411019c1f7785ea4939"/>
     </application>
     
     <queries>

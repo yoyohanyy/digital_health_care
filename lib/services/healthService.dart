@@ -71,7 +71,9 @@ class HealthService {
   /// Health Connect SDK 상태 확인
   Future<bool> getSdkStatus() async {
     try {
+      debugPrint('SDK 상태 확인 중...');
       final status = await _health.getHealthConnectSdkStatus();
+      debugPrint('SDK 상태: $status');
       return status == HealthConnectSdkStatus.sdkAvailable;
     } catch (e) {
       debugPrint('SDK 상태 확인 실패: $e');
@@ -79,7 +81,7 @@ class HealthService {
     }
   }
 
-  /// 건강 데이터 가져오기 (default: 어제~오늘)
+  /// 수면 데이터 가져오기 (default: 어제~오늘)
   Future<List<HealthDataPoint>> getSleepData(
       {DateTime? start, DateTime? end}) async {
     start ??= DateTime.now().subtract(const Duration(days: 1));
@@ -96,12 +98,24 @@ class HealthService {
       return [];
     }
   }
+
   /// 하루 전체 수면 시간 문자열과 총 수면 정보를 반환
   Future<Map<String, dynamic>> fetchDailySleepData() async {
     await authorize(); // 권한 요청
 
-    // 수면 데이터 가져오기
     List<HealthDataPoint> sleepData = await getSleepData();
+
+    if (sleepData.isEmpty) {
+      // 수면 데이터 없을 경우 기본값 반환
+      return {
+        'sleepString': "데이터 없음",
+        'totalMinutes': 0,
+        'totalHours': 0.0,
+        'startTime': null,
+        'endTime': null,
+        'deepSleep': 0.0,
+      };
+    }
 
     int totalMinutes = 0;
     DateTime? firstStart;
@@ -127,7 +141,7 @@ class HealthService {
     int hours = totalMinutes ~/ 60;
     int minutes = totalMinutes % 60;
 
-    String sleepString = minutes == 0 ? "$hours시간" : "$hours시간 $minutes분";
+    String sleepString = totalMinutes == 0 ? "데이터 없음" : (minutes == 0 ? "$hours시간" : "$hours시간 $minutes분");
 
     return {
       'sleepString': sleepString,
