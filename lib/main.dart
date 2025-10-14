@@ -35,7 +35,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF1A202C),
       ),
-      home: const ReportPage(),
+      home: const SplashPage(),
     );
   }
 }

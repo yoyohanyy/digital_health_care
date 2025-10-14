@@ -1,8 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../services/kakaoService.dart';
+import 'loginPage.dart';
 
 class MyPage extends StatelessWidget {
-  const MyPage({super.key});
+  MyPage({super.key});
+
+  final KakaoService _kakaoService = KakaoService();
 
   @override
   Widget build(BuildContext context) {
@@ -55,20 +59,25 @@ class MyPage extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Options
-            _menuTile("건강 데이터 연동하기"),
-            _menuTile("카카오 챗봇 연결하기"),
-            _menuTile("알림 설정?"),
-            _menuTile("앱 정보"),
-            _menuTile("약관 및 정책"),
-            _menuTile("로그아웃"),
-            _menuTile("탈퇴하기", isDestructive: true),
+            _menuTile(context, "건강 데이터 연동하기"),
+            _menuTile(context, "카카오 챗봇 연결하기"),
+            _menuTile(context, "알림 설정?"),
+            _menuTile(context, "앱 정보"),
+            _menuTile(context, "약관 및 정책"),
+            _menuTile(context, "로그아웃", onTap: () => _logout(context)),
+            _menuTile(context, "탈퇴하기", isDestructive: true),
           ],
         ),
       ),
     );
   }
 
-  Widget _menuTile(String text, {bool isDestructive = false}) {
+  Widget _menuTile(
+    BuildContext context,
+    String text, {
+    bool isDestructive = false,
+    VoidCallback? onTap,
+  }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -85,10 +94,30 @@ class MyPage extends StatelessWidget {
           ),
         ),
         trailing: const Icon(Icons.chevron_right, color: Colors.white54),
-        onTap: () {
-          // TODO: add navigation or actions
-        },
+        onTap:
+            onTap ??
+            () {
+              // Default TODO action
+            },
       ),
     );
+  }
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await _kakaoService.logout(); // Log out from Kakao
+      if (!context.mounted) return;
+      // Navigate back to LoginPage
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
+    } catch (e) {
+      // Handle errors (optional)
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("로그아웃 실패: $e")));
+    }
   }
 }

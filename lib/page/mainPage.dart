@@ -13,7 +13,7 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0; // Start with Home page
 
-  final List<Widget> _pages = const [HomePage(), ReportPage(), MyPage()];
+  final List<Widget> _pages = [HomePage(), ReportPage(), MyPage()];
 
   @override
   Widget build(BuildContext context) {
