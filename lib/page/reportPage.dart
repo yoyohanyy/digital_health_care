@@ -40,6 +40,7 @@ class _ReportPageState extends State<ReportPage>
   // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentWeekStart;
+  double _targetSleepDurationHours = 8.0; //목표 수면 시간을 저장할 곳
 
   @override
   void initState() {
@@ -81,9 +82,24 @@ class _ReportPageState extends State<ReportPage>
     final wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
     final bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
 
+    // ✅ 목표 수면 시간(분) 계산
+    int bedTimeInMinutes = bedTime.hour * 60 + bedTime.minute;
+    int wakeUpTimeInMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
+
+    int durationInMinutes;
+
+    // 취침 시간이 기상 시간보다 늦으면 (예: 23시 취침, 07시 기상)
+    if (bedTimeInMinutes > wakeUpTimeInMinutes) {
+      durationInMinutes = (24 * 60 - bedTimeInMinutes) + wakeUpTimeInMinutes;
+    } else {
+      durationInMinutes = wakeUpTimeInMinutes - bedTimeInMinutes;
+    }
+
     setState(() {
       _targetSleepTimeString =
           '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+
+      _targetSleepDurationHours = durationInMinutes / 60.0;
     });
   }
 
@@ -237,6 +253,18 @@ class _ReportPageState extends State<ReportPage>
       (i) => _currentWeekStart.add(Duration(days: i)),
     );
 
+    // ✅ 수면 목표 달성률 계산
+    // _targetSleepDurationHours가 0보다 클 때만 계산 (0으로 나누기 방지)
+    final double sleepPercent =
+        (_targetSleepDurationHours > 0)
+            ? (_totalHours / _targetSleepDurationHours).clamp(
+              0.0,
+              1.0,
+            ) // 0.0과 1.0 사이 값으로 제한
+            : 0.0;
+
+    final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -333,9 +361,9 @@ class _ReportPageState extends State<ReportPage>
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
-            percent: 0.76,
-            center: const Text(
-              "76%",
+            percent: sleepPercent,
+            center: Text(
+              percentText,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             progressColor: Color(0xFFAEC6CF),
