@@ -21,24 +21,25 @@ class HealthService {
   }
 
   /// iOS/Android 수면 데이터 타입 정의
-  List<HealthDataType> get types => Platform.isAndroid
-      ? [
-    HealthDataType.SLEEP_SESSION,
-    HealthDataType.SLEEP_ASLEEP,
-    HealthDataType.SLEEP_AWAKE,
-    HealthDataType.SLEEP_DEEP,
-    HealthDataType.SLEEP_LIGHT,
-    HealthDataType.SLEEP_REM,
-  ]
-      : [
-    HealthDataType.SLEEP_SESSION,
-    HealthDataType.SLEEP_IN_BED,
-    HealthDataType.SLEEP_ASLEEP,
-    HealthDataType.SLEEP_AWAKE,
-    HealthDataType.SLEEP_DEEP,
-    HealthDataType.SLEEP_LIGHT,
-    HealthDataType.SLEEP_REM,
-  ];
+  List<HealthDataType> get types =>
+      Platform.isAndroid
+          ? [
+            HealthDataType.SLEEP_SESSION,
+            HealthDataType.SLEEP_ASLEEP,
+            HealthDataType.SLEEP_AWAKE,
+            HealthDataType.SLEEP_DEEP,
+            HealthDataType.SLEEP_LIGHT,
+            HealthDataType.SLEEP_REM,
+          ]
+          : [
+            HealthDataType.SLEEP_SESSION,
+            HealthDataType.SLEEP_IN_BED,
+            HealthDataType.SLEEP_ASLEEP,
+            HealthDataType.SLEEP_AWAKE,
+            HealthDataType.SLEEP_DEEP,
+            HealthDataType.SLEEP_LIGHT,
+            HealthDataType.SLEEP_REM,
+          ];
 
   /// READ + WRITE 권한 설정
   List<HealthDataAccess> get permissions =>
@@ -46,8 +47,10 @@ class HealthService {
 
   /// 권한 확인 및 요청
   Future<void> authorize() async {
-    bool? hasPermissions =
-    await _health.hasPermissions(types, permissions: permissions);
+    bool? hasPermissions = await _health.hasPermissions(
+      types,
+      permissions: permissions,
+    );
 
     if (hasPermissions != true) {
       try {
@@ -81,9 +84,11 @@ class HealthService {
     }
   }
 
-  /// 수면 데이터 가져오기 (default: 어제~오늘)
-  Future<List<HealthDataPoint>> getSleepData(
-      {DateTime? start, DateTime? end}) async {
+  /// 수면 데이터 가져오기 (기본: 어제~오늘)
+  Future<List<HealthDataPoint>> getSleepData({
+    DateTime? start,
+    DateTime? end,
+  }) async {
     start ??= DateTime.now().subtract(const Duration(days: 1));
     end ??= DateTime.now();
     try {
@@ -99,14 +104,13 @@ class HealthService {
     }
   }
 
-  /// 하루 전체 수면 시간 문자열과 총 수면 정보를 반환
+  /// 하루 전체 수면 시간 문자열과 총 수면 정보를 반환 (어제~오늘)
   Future<Map<String, dynamic>> fetchDailySleepData() async {
     await authorize(); // 권한 요청
 
     List<HealthDataPoint> sleepData = await getSleepData();
 
     if (sleepData.isEmpty) {
-      // 수면 데이터 없을 경우 기본값 반환
       return {
         'sleepString': "데이터 없음",
         'totalMinutes': 0,
@@ -129,21 +133,89 @@ class HealthService {
         final duration = end.difference(start).inMinutes;
         totalMinutes += duration;
 
-        if (firstStart == null || start.isBefore(firstStart)) firstStart = start;
+        if (firstStart == null || start.isBefore(firstStart))
+          firstStart = start;
         if (lastEnd == null || end.isAfter(lastEnd)) lastEnd = end;
       }
 
       if (point.type == HealthDataType.SLEEP_DEEP) {
-        deepSleep += (point.value is num ? (point.value as num).toDouble() : 0.0);
+        deepSleep +=
+            (point.value is num ? (point.value as num).toDouble() : 0.0);
       }
     }
 
     int hours = totalMinutes ~/ 60;
     int minutes = totalMinutes % 60;
 
-    String sleepString = totalMinutes == 0 ? "데이터 없음" : (minutes == 0 ? "$hours시간" : "$hours시간 $minutes분");
+    String sleepString =
+        totalMinutes == 0
+            ? "데이터 없음"
+            : (minutes == 0 ? "$hours시간" : "$hours시간 $minutes분");
 
     return {
+      'sleepString': sleepString,
+      'totalMinutes': totalMinutes,
+      'totalHours': totalMinutes / 60.0,
+      'startTime': firstStart,
+      'endTime': lastEnd,
+      'deepSleep': deepSleep,
+    };
+  }
+
+  /// ✅ 특정 날짜의 수면 데이터 가져오기
+  Future<Map<String, dynamic>> fetchDailySleepDataForDate(DateTime date) async {
+    await authorize(); // 권한 요청
+
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final sleepData = await getSleepData(start: startOfDay, end: endOfDay);
+
+    if (sleepData.isEmpty) {
+      return {
+        'date': date,
+        'sleepString': "데이터 없음",
+        'totalMinutes': 0,
+        'totalHours': 0.0,
+        'startTime': null,
+        'endTime': null,
+        'deepSleep': 0.0,
+      };
+    }
+
+    int totalMinutes = 0;
+    DateTime? firstStart;
+    DateTime? lastEnd;
+    double deepSleep = 0;
+
+    for (var point in sleepData) {
+      if (point.type == HealthDataType.SLEEP_SESSION) {
+        final start = point.dateFrom.toLocal();
+        final end = point.dateTo.toLocal();
+        final duration = end.difference(start).inMinutes;
+        totalMinutes += duration;
+
+        if (firstStart == null || start.isBefore(firstStart))
+          firstStart = start;
+        if (lastEnd == null || end.isAfter(lastEnd)) lastEnd = end;
+      }
+
+      if (point.type == HealthDataType.SLEEP_DEEP) {
+        deepSleep +=
+            (point.value is num ? (point.value as num).toDouble() : 0.0);
+      }
+    }
+
+    int hours = totalMinutes ~/ 60;
+    int minutes = totalMinutes % 60;
+
+    String sleepString =
+        totalMinutes == 0
+            ? "데이터 없음"
+            : (minutes == 0 ? "$hours시간" : "$hours시간 $minutes분");
+
+    return {
+      'date': date,
       'sleepString': sleepString,
       'totalMinutes': totalMinutes,
       'totalHours': totalMinutes / 60.0,

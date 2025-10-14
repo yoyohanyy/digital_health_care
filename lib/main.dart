@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:health_care_app/page/reportPage.dart';
 import './page/splashPage.dart'; // SplashPage import
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -34,7 +35,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF1A202C),
       ),
-      home: const SplashPage(),
+      home: const ReportPage(),
     );
   }
 }

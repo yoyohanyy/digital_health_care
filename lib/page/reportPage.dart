@@ -21,25 +21,41 @@ class _ReportPageState extends State<ReportPage>
   late TabController _tabController;
   final HealthService _healthService = HealthService();
   final FirebaseService _firebaseService = FirebaseService();
+
   Health health = Health();
   String _sleepDataString = "데이터 없음";
-  double _totalHours = 0.0; // 총 수면 시간 (시간 단위)
-  DateTime? _sleepStartTime; // 수면 시작 시간
-  DateTime? _sleepEndTime; // 수면 종료 시간
+  double _totalHours = 0.0;
+  DateTime? _sleepStartTime;
+  DateTime? _sleepEndTime;
   double _deepSleep = 0.0;
-  Map<DateTime, double> _weeklySleep = {}; // 0~6: 주간 수면 시간
-  bool _isLoading = true; // 데이터 로딩 상태
-  DateTime weekStart = DateTime.now().subtract(Duration(days: 6));
+  Map<DateTime, double> _weeklySleep = {};
+  bool _isLoading = true;
+
+  // 🆕 For dynamic date navigation
+  DateTime _selectedDate = DateTime.now();
+  late DateTime _currentWeekStart;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadSleepData();
+
+    // ✅ Initialize the current week (Sunday as start)
+    _currentWeekStart = _getStartOfWeek(_selectedDate);
+
+    // ✅ Load sleep data
+    _loadSleepDataForDate(_selectedDate);
     _loadWeeklySleep();
   }
 
-  Future<void> _loadSleepData() async {
-    final sleepInfo = await _healthService.fetchDailySleepData();
+  // Helper to get start of the week (Sunday)
+  DateTime _getStartOfWeek(DateTime date) {
+    // weekday: Monday=1, Sunday=7 → Sunday start = subtract weekday % 7
+    return date.subtract(Duration(days: date.weekday % 7));
+  }
+
+  Future<void> _loadSleepDataForDate(DateTime date) async {
+    final sleepInfo = await _healthService.fetchDailySleepDataForDate(date);
 
     setState(() {
       _sleepDataString = sleepInfo['sleepString'] ?? "데이터 없음";
@@ -48,24 +64,20 @@ class _ReportPageState extends State<ReportPage>
       _sleepEndTime = sleepInfo['endTime'];
       _deepSleep = sleepInfo['deepSleep'];
     });
-    // ---------------- DB 저장 ----------------
+
     if (_sleepStartTime != null && _sleepEndTime != null) {
-      await _firebaseService.newsaveSleepData(
-        "test_user_123", // 실제 로그인한 userId로 교체
-        {
-          'startTime': _sleepStartTime,
-          'endTime': _sleepEndTime,
-          'totalMinutes': _totalHours * 60,
-          'deepSleep': _deepSleep,
-        },
-      );
+      await _firebaseService.newsaveSleepData("test_user_123", {
+        'startTime': _sleepStartTime,
+        'endTime': _sleepEndTime,
+        'totalMinutes': _totalHours * 60,
+        'deepSleep': _deepSleep,
+      });
     }
   }
 
   Future<void> _loadWeeklySleep() async {
-    final firebaseService = FirebaseService();
-    final data = await firebaseService.getWeeklySleep("test_user_123");
-    print("📊 주간 수면 데이터: $data"); // 🔹 디버깅용 출력
+    final data = await _firebaseService.getWeeklySleep("test_user_123");
+    debugPrint("📊 주간 수면 데이터: $data");
     setState(() {
       _weeklySleep = data;
       _isLoading = false;
@@ -75,20 +87,39 @@ class _ReportPageState extends State<ReportPage>
   Future<void> _saveSleepData() async {
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveSleepData(
-        userId: "test_user_123", // 실제 로그인 UID
+        userId: "test_user_123",
         startTime: _sleepStartTime!,
         endTime: _sleepEndTime!,
         totalHours: _totalHours,
         deepSleep: _deepSleep,
         satisfaction: 81,
-        date: '',
+        date: DateFormat('yyyy-MM-dd').format(_selectedDate),
         feedback: '',
         createdAt: null,
-        updatedAt: null, // 예시값, 실제 계산 로직 필요
+        updatedAt: null,
       );
     } else {
-      print("⚠️ 수면 데이터가 준비되지 않았습니다.");
+      debugPrint("⚠️ 수면 데이터가 준비되지 않았습니다.");
     }
+  }
+
+  void _goToPreviousWeek() {
+    setState(() {
+      _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
+    });
+  }
+
+  void _goToNextWeek() {
+    setState(() {
+      _currentWeekStart = _currentWeekStart.add(const Duration(days: 7));
+    });
+  }
+
+  void _selectDate(DateTime date) {
+    setState(() {
+      _selectedDate = date;
+    });
+    _loadSleepDataForDate(date);
   }
 
   @override
@@ -97,6 +128,7 @@ class _ReportPageState extends State<ReportPage>
     super.dispose();
   }
 
+  // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -125,6 +157,11 @@ class _ReportPageState extends State<ReportPage>
 
   // ---------------- Daily Report ----------------
   Widget _buildDailyReport() {
+    List<DateTime> weekDays = List.generate(
+      7,
+      (i) => _currentWeekStart.add(Duration(days: i)),
+    );
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -139,7 +176,6 @@ class _ReportPageState extends State<ReportPage>
                   0.0,
                   _totalHours,
                 );
-                final today = DateTime.now();
 
                 Navigator.push(
                   context,
@@ -152,9 +188,7 @@ class _ReportPageState extends State<ReportPage>
                           dayOfWeek: DateFormat(
                             'EEEE',
                             'ko_KR',
-                          ).format(today), // '목요일' 같이 동적으로 요일 전달
-                          // 아래 값들은 현재 ReportPage에 없으므로 임시 값을 전달합니다.
-                          // 나중에 HealthKit 등에서 가져오면 변수로 교체하세요.
+                          ).format(_selectedDate),
                           sleepScore: 78,
                           avgHeartRate: 98,
                           sleepSatisfaction: "보통",
@@ -167,32 +201,71 @@ class _ReportPageState extends State<ReportPage>
           ),
           const SizedBox(height: 20),
 
-          // Date Row (simple mockup)
+          // 🗓 Dynamic Date Row
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.chevron_left, color: Colors.white54),
-              const SizedBox(width: 10),
-              for (int i = 9; i <= 15; i++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Text(
-                    "$i",
-                    style: TextStyle(
-                      color: i == 12 ? Colors.white : Colors.white54,
-                      fontWeight: i == 12 ? FontWeight.bold : FontWeight.normal,
-                      fontSize: 16,
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: Colors.white54),
+                onPressed: _goToPreviousWeek,
+              ),
+              for (var day in weekDays)
+                GestureDetector(
+                  onTap: () => _selectDate(day),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Column(
+                      children: [
+                        Text(
+                          DateFormat.E('ko_KR').format(day),
+                          style: TextStyle(
+                            color:
+                                _isSameDay(day, _selectedDate)
+                                    ? Colors.white
+                                    : Colors.white54,
+                            fontWeight:
+                                _isSameDay(day, _selectedDate)
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "${day.day}",
+                          style: TextStyle(
+                            color:
+                                _isSameDay(day, _selectedDate)
+                                    ? Colors.white
+                                    : Colors.white54,
+                            fontWeight:
+                                _isSameDay(day, _selectedDate)
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                            fontSize: 16,
+                          ),
+                        ),
+                        if (_isSameDay(day, _selectedDate))
+                          const Padding(
+                            padding: EdgeInsets.only(top: 2),
+                            child: CircleAvatar(
+                              radius: 3,
+                              backgroundColor: Colors.white70,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-              const SizedBox(width: 10),
-              const Icon(Icons.chevron_right, color: Colors.white54),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: Colors.white54),
+                onPressed: _goToNextWeek,
+              ),
             ],
           ),
 
           const SizedBox(height: 30),
 
-          // Title
           const Text(
             "수면 성취",
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -202,10 +275,8 @@ class _ReportPageState extends State<ReportPage>
             "목표 수면 대비 실제 수면 비율",
             style: TextStyle(color: Colors.white54),
           ),
-
           const SizedBox(height: 30),
 
-          // Circular Progress
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
@@ -221,8 +292,8 @@ class _ReportPageState extends State<ReportPage>
 
           const SizedBox(height: 40),
 
-          // Info Card
           _infoCard([
+            _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
             _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
             _infoRow("실제 수면 시간", _sleepDataString),
             _infoRow("수면 만족도 평가", "보통"),
@@ -230,14 +301,12 @@ class _ReportPageState extends State<ReportPage>
 
           const SizedBox(height: 20),
 
-          // Daily Feedback Box
           _infoCard([
             const Text("일간 피드백", style: TextStyle(fontSize: 16)),
           ], height: 80),
 
           const SizedBox(height: 20),
 
-          // Time Capsule Box
           _infoCard([
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -248,6 +317,7 @@ class _ReportPageState extends State<ReportPage>
             ),
           ], height: 60),
           const SizedBox(height: 20),
+
           ElevatedButton(
             onPressed: _saveSleepData,
             child: const Text("저장", style: TextStyle(fontSize: 16)),
@@ -259,15 +329,13 @@ class _ReportPageState extends State<ReportPage>
 
   // ---------------- Weekly Report ----------------
   Widget _buildWeeklyReport() {
+    DateTime weekStart = DateTime.now().subtract(Duration(days: 6));
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
           const SizedBox(height: 10),
-          const Text(
-            "2025년 8월 9일 - 8월 15일",
-            style: TextStyle(color: Colors.white70),
-          ),
+          const Text("이번 주 수면 데이터", style: TextStyle(color: Colors.white70)),
           const SizedBox(height: 20),
           Expanded(
             child:
@@ -330,9 +398,9 @@ class _ReportPageState extends State<ReportPage>
                                 DateTime date = weekStart.add(
                                   Duration(days: index),
                                 );
-                                String label = DateFormat.E().format(
-                                  date,
-                                ); // 요일 표시 (Mon, Tue …)
+                                String label = DateFormat.E(
+                                  'ko_KR',
+                                ).format(date);
                                 return Text(
                                   label,
                                   style: const TextStyle(color: Colors.white70),
@@ -378,7 +446,7 @@ class _ReportPageState extends State<ReportPage>
       barRods: [
         BarChartRodData(
           toY: y,
-          color: highlighted ? Color(0xFFAEC6CF) : Colors.grey[600],
+          color: highlighted ? const Color(0xFFAEC6CF) : Colors.grey[600],
           width: 18,
           borderRadius: BorderRadius.circular(6),
         ),
@@ -393,7 +461,7 @@ class _ReportPageState extends State<ReportPage>
       child: Column(
         children: [
           TableCalendar(
-            focusedDay: DateTime(2025, 9, 1),
+            focusedDay: DateTime.now(),
             firstDay: DateTime(2020),
             lastDay: DateTime(2030),
             calendarFormat: CalendarFormat.month,
@@ -417,38 +485,6 @@ class _ReportPageState extends State<ReportPage>
               defaultTextStyle: TextStyle(color: Colors.white),
               weekendTextStyle: TextStyle(color: Colors.white70),
             ),
-            calendarBuilders: CalendarBuilders(
-              defaultBuilder: (context, day, focusedDay) {
-                if (day.day == 1) {
-                  return Center(
-                    child: Text(
-                      "1\nbad",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.redAccent, fontSize: 12),
-                    ),
-                  );
-                }
-                if (day.day == 2) {
-                  return Center(
-                    child: Text(
-                      "2\ngood",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.greenAccent, fontSize: 12),
-                    ),
-                  );
-                }
-                if (day.day == 3) {
-                  return Center(
-                    child: Text(
-                      "3\nnormal",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  );
-                }
-                return null;
-              },
-            ),
           ),
           const SizedBox(height: 20),
           _infoCard([
@@ -467,6 +503,10 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- UI Helpers ----------------
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   Widget _infoCard(List<Widget> children, {double? height}) {
     return Container(
       width: double.infinity,
