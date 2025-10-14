@@ -10,6 +10,8 @@ import '../services/firebaseService.dart';
 import 'sharePage.dart';
 import '../provider/userProvider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -33,6 +35,7 @@ class _ReportPageState extends State<ReportPage>
   Map<DateTime, double> _weeklySleep = {};
   bool _isLoading = true;
   int _currentTabIndex = 0;
+  String _targetSleepTimeString = "00:00 AM - 00:00 AM";
 
   // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
@@ -57,12 +60,37 @@ class _ReportPageState extends State<ReportPage>
     // ✅ Load sleep data
     _loadSleepDataForDate(_selectedDate);
     _loadWeeklySleep();
+    _loadTargetSleepTime();
   }
 
   // Helper to get start of the week (Sunday)
   DateTime _getStartOfWeek(DateTime date) {
     // weekday: Monday=1, Sunday=7 → Sunday start = subtract weekday % 7
     return date.subtract(Duration(days: date.weekday % 7));
+  }
+
+  Future<void> _loadTargetSleepTime() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 저장된 값이 없으면 기본값 사용
+    final wakeUpHour = prefs.getInt('wakeUpHour') ?? 8;
+    final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? 0;
+    final bedTimeHour = prefs.getInt('bedTimeHour') ?? 0;
+    final bedTimeMinute = prefs.getInt('bedTimeMinute') ?? 0;
+
+    final wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
+    final bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
+
+    setState(() {
+      _targetSleepTimeString =
+          '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+    });
+  }
+
+  String _formatTimeOfDay(TimeOfDay tod) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+    return DateFormat('hh:mm a', 'en_US').format(dt);
   }
 
   Future<void> _loadSleepDataForDate(DateTime date) async {
@@ -77,9 +105,8 @@ class _ReportPageState extends State<ReportPage>
     });
 
     if (_sleepStartTime != null && _sleepEndTime != null) {
-
       await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -102,7 +129,7 @@ class _ReportPageState extends State<ReportPage>
   Future<void> _saveSleepData() async {
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -143,7 +170,7 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
-   // ✅ 로그인된 사용자 정보
+    // ✅ 로그인된 사용자 정보
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),
@@ -320,7 +347,7 @@ class _ReportPageState extends State<ReportPage>
 
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
-            _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
+            _infoRow("목표 수면 시간", _targetSleepTimeString),
             _infoRow("실제 수면 시간", _sleepDataString),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
