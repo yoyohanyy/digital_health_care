@@ -13,6 +13,8 @@ import '../services/firebaseService.dart';
 import 'sharePage.dart';
 import '../provider/userProvider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -36,10 +38,12 @@ class _ReportPageState extends State<ReportPage>
   Map<DateTime, double> _weeklySleep = {};
   bool _isLoading = true;
   int _currentTabIndex = 0;
+  String _targetSleepTimeString = "00:00 AM - 00:00 AM";
 
   // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentWeekStart;
+  double _targetSleepDurationHours = 8.0; //목표 수면 시간을 저장할 곳
 
   @override
   void initState() {
@@ -59,11 +63,11 @@ class _ReportPageState extends State<ReportPage>
 
     // ✅ Load sleep data
     _loadSleepDataForDate(_selectedDate);
-    //_loadWeeklySleep();
 
     // Firebase 데이터 불러오기
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _loadSleepRecords();
+      _loadTargetSleepTime();
     });
   }
 
@@ -71,6 +75,45 @@ class _ReportPageState extends State<ReportPage>
   DateTime _getStartOfWeek(DateTime date) {
     // weekday: Monday=1, Sunday=7 → Sunday start = subtract weekday % 7
     return date.subtract(Duration(days: date.weekday % 7));
+  }
+
+  Future<void> _loadTargetSleepTime() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 저장된 값이 없으면 기본값 사용
+    final wakeUpHour = prefs.getInt('wakeUpHour') ?? 8;
+    final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? 0;
+    final bedTimeHour = prefs.getInt('bedTimeHour') ?? 0;
+    final bedTimeMinute = prefs.getInt('bedTimeMinute') ?? 0;
+
+    final wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
+    final bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
+
+    // ✅ 목표 수면 시간(분) 계산
+    int bedTimeInMinutes = bedTime.hour * 60 + bedTime.minute;
+    int wakeUpTimeInMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
+
+    int durationInMinutes;
+
+    // 취침 시간이 기상 시간보다 늦으면 (예: 23시 취침, 07시 기상)
+    if (bedTimeInMinutes > wakeUpTimeInMinutes) {
+      durationInMinutes = (24 * 60 - bedTimeInMinutes) + wakeUpTimeInMinutes;
+    } else {
+      durationInMinutes = wakeUpTimeInMinutes - bedTimeInMinutes;
+    }
+
+    setState(() {
+      _targetSleepTimeString =
+          '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+
+      _targetSleepDurationHours = durationInMinutes / 60.0;
+    });
+  }
+
+  String _formatTimeOfDay(TimeOfDay tod) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+    return DateFormat('hh:mm a', 'en_US').format(dt);
   }
 
   Future<void> _loadSleepDataForDate(DateTime date) async {
@@ -85,9 +128,8 @@ class _ReportPageState extends State<ReportPage>
     });
 
     if (_sleepStartTime != null && _sleepEndTime != null) {
-
       await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -108,7 +150,7 @@ class _ReportPageState extends State<ReportPage>
       _isLoading = false;
     });
   }
-
+  
 
   void _goToPreviousWeek() {
     setState(() {
@@ -250,6 +292,18 @@ class _ReportPageState extends State<ReportPage>
       (i) => _currentWeekStart.add(Duration(days: i)),
     );
 
+    // ✅ 수면 목표 달성률 계산
+    // _targetSleepDurationHours가 0보다 클 때만 계산 (0으로 나누기 방지)
+    final double sleepPercent =
+        (_targetSleepDurationHours > 0)
+            ? (_totalHours / _targetSleepDurationHours).clamp(
+              0.0,
+              1.0,
+            ) // 0.0과 1.0 사이 값으로 제한
+            : 0.0;
+
+    final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -346,9 +400,9 @@ class _ReportPageState extends State<ReportPage>
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
-            percent: 0.76,
-            center: const Text(
-              "76%",
+            percent: sleepPercent,
+            center: Text(
+              percentText,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             progressColor: Color(0xFFAEC6CF),
@@ -360,7 +414,7 @@ class _ReportPageState extends State<ReportPage>
 
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
-            _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
+            _infoRow("목표 수면 시간", _targetSleepTimeString),
             _infoRow("실제 수면 시간", "${todayRecord.totalHours}시간"),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
