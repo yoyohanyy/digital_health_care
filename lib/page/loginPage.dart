@@ -8,7 +8,6 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kakaoService = KakaoService();
-
     return Scaffold(
       backgroundColor: const Color(0xFF1A202C), // 카카오 색상
       body: SafeArea(

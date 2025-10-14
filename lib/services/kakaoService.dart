@@ -30,7 +30,6 @@ class KakaoService {
 
       // 로그인 성공 후 사용자 정보 가져오기
       await saveUserInfo();
-
       print("로그인 성공");
       return true;
     } catch (e) {
@@ -79,6 +78,8 @@ class KakaoService {
         'nickname': nickname,
         'profileImage': profileImage,
         'lastLogin': DateTime.now(),
+        'sleepStartTime': '22:00',         // 기본값 설정
+        'recommendedWakeUpTime': '06:00',  // 기본값 설정
       }, SetOptions(merge: true));
 
       print("✅ 사용자 정보 저장 완료");

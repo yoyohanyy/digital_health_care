@@ -8,6 +8,8 @@ import 'package:table_calendar/table_calendar.dart';
 import '../services/healthService.dart';
 import '../services/firebaseService.dart';
 import 'sharePage.dart';
+import '../provider/userProvider.dart';
+import 'package:provider/provider.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -75,12 +77,16 @@ class _ReportPageState extends State<ReportPage>
     });
 
     if (_sleepStartTime != null && _sleepEndTime != null) {
-      await _firebaseService.newsaveSleepData("test_user_123", {
-        'startTime': _sleepStartTime,
-        'endTime': _sleepEndTime,
-        'totalMinutes': _totalHours * 60,
-        'deepSleep': _deepSleep,
-      });
+
+      await _firebaseService.saveTodaySleepData(
+        "test_user_123",  // 실제 로그인한 userId로 교체
+        {
+          'startTime': _sleepStartTime,
+          'endTime': _sleepEndTime,
+          'totalMinutes': _totalHours * 60,
+          'deepSleep': _deepSleep,
+        },
+      );
     }
   }
 
@@ -88,24 +94,21 @@ class _ReportPageState extends State<ReportPage>
     final data = await _firebaseService.getWeeklySleep("test_user_123");
     debugPrint("📊 주간 수면 데이터: $data");
     setState(() {
-      _weeklySleep = data;
+      _weeklySleep = data as Map<DateTime, double>;
       _isLoading = false;
     });
   }
 
   Future<void> _saveSleepData() async {
     if (_sleepStartTime != null && _sleepEndTime != null) {
-      await _firebaseService.saveSleepData(
-        userId: "test_user_123",
-        startTime: _sleepStartTime!,
-        endTime: _sleepEndTime!,
-        totalHours: _totalHours,
-        deepSleep: _deepSleep,
-        satisfaction: 81,
-        date: DateFormat('yyyy-MM-dd').format(_selectedDate),
-        feedback: '',
-        createdAt: null,
-        updatedAt: null,
+      await _firebaseService.saveTodaySleepData(
+        "test_user_123",  // 실제 로그인한 userId로 교체
+        {
+          'startTime': _sleepStartTime,
+          'endTime': _sleepEndTime,
+          'totalMinutes': _totalHours * 60,
+          'deepSleep': _deepSleep,
+        },
       );
     } else {
       debugPrint("⚠️ 수면 데이터가 준비되지 않았습니다.");
@@ -140,6 +143,7 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
+   // ✅ 로그인된 사용자 정보
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),

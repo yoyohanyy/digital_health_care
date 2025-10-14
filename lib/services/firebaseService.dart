@@ -1,104 +1,92 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
-
 import '../DTO/sleepRecordDTO.dart';
 
 class FirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  Future<void> saveSleepData({
-    required String userId,
-    required String date,
-    required DateTime startTime,
-    required DateTime endTime,
-    required double totalHours,
-    required double deepSleep,
-    required int satisfaction,
-    required String feedback,
-    required createdAt,
-    required updatedAt,
-  }) async {
-    try {
-      final sleepRef = _db
-          .collection('sleepRecords')
-          .doc(userId)
-          .collection('daily')
-          .doc(date);
 
-      await sleepRef.set({
-        'startTime': startTime,
-        'endTime': endTime,
-        'totalHours': totalHours,
-        'deepSleep': deepSleep,
-        'satisfaction': satisfaction,
-        'feedback': feedback,
-        'createdAt': createdAt,
-        'updatedAt': updatedAt,
-      });
+  /// 오늘 수면 데이터 저장 또는 업데이트
+  Future<void> saveTodaySleepData(String userId, Map<String, dynamic> sleepInfo) async {
+    final today = DateTime.now();
+    final dateId =
+        "${today.year}-${today.month.toString().padLeft(2,'0')}-${today.day.toString().padLeft(2,'0')}";
 
-      print("✅ 수면 데이터 저장 성공");
-    } catch (e) {
-      print("❌ 수면 데이터 저장 실패: $e");
-    }
-  }
-
-  /// 최근 7일 수면 시간 가져오기
-  Future<Map<DateTime, double>> getWeeklySleep(String userId) async {
-    DateTime now = DateTime.now();
-    DateTime weekStart = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: 6));
-
-    QuerySnapshot snapshot = await _db
-        .collection('sleepRecords')
+    final docRef = _db
+        .collection('sleep_records')
         .doc(userId)
         .collection('daily')
-        .where('startTime', isGreaterThanOrEqualTo: weekStart)
-        .orderBy('startTime')
-        .get();
+        .doc(dateId);
 
-    Map<DateTime, double> weeklyHours = {};
+    final docSnap = await docRef.get();
 
-    for (var doc in snapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      DateTime start = (data['startTime'] as Timestamp).toDate();
-      DateTime end = (data['endTime'] as Timestamp).toDate();
-      double hours = end.difference(start).inMinutes / 60.0;
+    if (docSnap.exists) {
+      // 이미 존재 → 기존 satisfaction/feedback 유지, 나머지 업데이트
+      final existingData = docSnap.data()!;
+      await docRef.update({
+        'startTime': sleepInfo['startTime'] ?? existingData['startTime'],
+        'endTime': sleepInfo['endTime'] ?? existingData['endTime'],
+        'totalHours': sleepInfo['totalHours'] ?? existingData['totalHours'],
+        'deepSleep': sleepInfo['deepSleep'] ?? existingData['deepSleep'],
+        'updatedAt': Timestamp.now(),
+      });
+      debugPrint("⚠️ 오늘 수면 데이터 업데이트 완료: $dateId");
+    } else {
+      // 새로 생성
+      final record = SleepRecord(
+        date: today,
+        startTime: sleepInfo['startTime'] ?? today,
+        endTime: sleepInfo['endTime'] ?? today,
+        totalHours: sleepInfo['totalHours'] ?? 0,
+        deepSleep: sleepInfo['deepSleep'] ?? 0,
+        satisfaction: 0,
+        feedback: '',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
 
-      // 날짜만 key로 사용
-      DateTime dateKey = DateTime(start.year, start.month, start.day);
-      weeklyHours[dateKey] = (weeklyHours[dateKey] ?? 0) + hours;
+      await docRef.set(record.toMap());
+      debugPrint("✅ 오늘 수면 데이터 저장 완료: $dateId");
     }
-
-    // 7일치 0으로 채우기
-    for (int i = 0; i < 7; i++) {
-      DateTime date = weekStart.add(Duration(days: i));
-      weeklyHours[date] = weeklyHours[date] ?? 0.0;
-    }
-
-    return weeklyHours;
   }
 
+  /// 최근 7일 수면 기록 조회
+  Future<List<SleepRecord>> getWeeklySleep(String userId, {int days = 7}) async {
+    DateTime today = DateTime.now();
+    DateTime start = today.subtract(Duration(days: days - 1));
 
-  Future<void> newsaveSleepData(String userId, Map<String, dynamic> sleepInfo) async {
-    final record = SleepRecord(
-      userId: userId,
-      date: DateTime.now(),
-      startTime: sleepInfo['startTime'] ?? DateTime.now(),
-      endTime: sleepInfo['endTime'] ?? DateTime.now(),
-      totalHours: sleepInfo['totalMinutes'] ?? 0,
-      deepSleep: sleepInfo['deepSleep'] ?? 0,
-      satisfaction: 0, // 초기값
-      feedback: '',    // 초기값
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    );
+    List<SleepRecord> records = [];
 
-    final docId = "${DateTime.now().toIso8601String()}_$userId";
+    for (int i = 0; i < days; i++) {
+      DateTime dateKey = DateTime(start.year, start.month, start.day + i);
+      String docId =
+          "${dateKey.year}-${dateKey.month.toString().padLeft(2,'0')}-${dateKey.day.toString().padLeft(2,'0')}";
+      DocumentSnapshot doc = await _db
+          .collection('sleep_records')
+          .doc(userId)
+          .collection('daily')
+          .doc(docId)
+          .get();
 
-    await FirebaseFirestore.instance
-        .collection('sleep_records')
-        .doc(docId)
-        .set(record.toMap());
+      if (doc.exists && doc.data() != null) {
+        records.add(SleepRecord.fromMap(doc.data() as Map<String, dynamic>));
+      } else {
+        // 없는 날은 0으로 채움
+        records.add(SleepRecord(
+          date: dateKey,
+          startTime: dateKey,
+          endTime: dateKey,
+          totalHours: 0,
+          deepSleep: 0,
+          satisfaction: 0,
+          feedback: '',
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        ));
+      }
+    }
 
-    debugPrint("수면 데이터 저장 완료: $docId");
+    // 최신순 정렬
+    records.sort((a, b) => b.date.compareTo(a.date));
+    return records;
   }
 }

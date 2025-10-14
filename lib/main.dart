@@ -1,5 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-
+import 'package:provider/provider.dart';
+import 'provider/userProvider.dart';
+import 'provider/sleepProvider.dart'; // SleepProvider import
 import 'package:firebase_core/firebase_core.dart';
 import 'package:health_care_app/page/reportPage.dart';
 import './page/splashPage.dart'; // SplashPage import
@@ -22,7 +25,16 @@ Future<void> main() async {
   } catch (e) {
     print("❌ Firebase 초기화 실패: $e");
   }
-  runApp(const MyApp());
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => SleepRecordProvider()), // UserProvider 추가
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {

@@ -1,7 +1,8 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../services/kakaoService.dart';
 import 'loginPage.dart';
+import 'package:provider/provider.dart';
+import '../provider/userProvider.dart'; // ✅ UserProvider import
 
 class MyPage extends StatelessWidget {
   MyPage({super.key});
@@ -10,6 +11,9 @@ class MyPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.user; // ✅ 로그인된 사용자 정보
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),
@@ -20,7 +24,7 @@ class MyPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Profile Box
+            // 🔹 프로필 박스
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -29,27 +33,31 @@ class MyPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
-                children: const [
+                children: [
+                  // ✅ 프로필 이미지
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.grey,
-                    child: Icon(Icons.person, size: 40, color: Colors.white),
+                    backgroundImage: (user?.profileImage != null &&
+                        user!.profileImage.isNotEmpty)
+                        ? NetworkImage(user.profileImage)
+                        : null,
+                    child: (user == null || user.profileImage.isEmpty)
+                        ? const Icon(Icons.person, size: 40, color: Colors.white)
+                        : null,
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
+
+                  // ✅ 닉네임 및 이메일 표시
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "이동은",
-                        style: TextStyle(
+                        user?.nickname ?? "사용자 이름",
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        "wp4106@naver.com",
-                        style: TextStyle(color: Colors.white70),
                       ),
                     ],
                   ),
@@ -57,7 +65,7 @@ class MyPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-
+            
             // Options
             _menuTile(context, "건강 데이터 연동하기"),
             _menuTile(context, "카카오 챗봇 연결하기"),
