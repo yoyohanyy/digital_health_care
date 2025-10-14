@@ -209,54 +209,64 @@ class _ReportPageState extends State<ReportPage>
                 icon: const Icon(Icons.chevron_left, color: Colors.white54),
                 onPressed: _goToPreviousWeek,
               ),
-              for (var day in weekDays)
-                GestureDetector(
-                  onTap: () => _selectDate(day),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Column(
-                      children: [
-                        Text(
-                          DateFormat.E('ko_KR').format(day),
-                          style: TextStyle(
-                            color:
-                                _isSameDay(day, _selectedDate)
-                                    ? Colors.white
-                                    : Colors.white54,
-                            fontWeight:
-                                _isSameDay(day, _selectedDate)
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                            fontSize: 14,
+              Expanded(
+                child: Row(
+                  // ✅ 7개의 날짜가 공간을 균등하게 나누도록 설정
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    for (var day in weekDays)
+                      // ✅ 각각의 날짜 아이템을 Expanded로 감싸서 균등하게 분배
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _selectDate(day),
+                          // 투명한 영역도 터치가 되도록 설정
+                          behavior: HitTestBehavior.opaque,
+                          child: Column(
+                            children: [
+                              Text(
+                                DateFormat.E('ko_KR').format(day),
+                                style: TextStyle(
+                                  color:
+                                      _isSameDay(day, _selectedDate)
+                                          ? Colors.white
+                                          : Colors.white54,
+                                  fontWeight:
+                                      _isSameDay(day, _selectedDate)
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "${day.day}",
+                                style: TextStyle(
+                                  color:
+                                      _isSameDay(day, _selectedDate)
+                                          ? Colors.white
+                                          : Colors.white54,
+                                  fontWeight:
+                                      _isSameDay(day, _selectedDate)
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if (_isSameDay(day, _selectedDate))
+                                const Padding(
+                                  padding: EdgeInsets.only(top: 2),
+                                  child: CircleAvatar(
+                                    radius: 3,
+                                    backgroundColor: Colors.white70,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          "${day.day}",
-                          style: TextStyle(
-                            color:
-                                _isSameDay(day, _selectedDate)
-                                    ? Colors.white
-                                    : Colors.white54,
-                            fontWeight:
-                                _isSameDay(day, _selectedDate)
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                            fontSize: 16,
-                          ),
-                        ),
-                        if (_isSameDay(day, _selectedDate))
-                          const Padding(
-                            padding: EdgeInsets.only(top: 2),
-                            child: CircleAvatar(
-                              radius: 3,
-                              backgroundColor: Colors.white70,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                      ),
+                  ],
                 ),
+              ),
               IconButton(
                 icon: const Icon(Icons.chevron_right, color: Colors.white54),
                 onPressed: _goToNextWeek,
