@@ -7,6 +7,7 @@ import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:table_calendar/table_calendar.dart';
 import '../services/healthService.dart';
 import '../services/firebaseService.dart';
+import 'sharePage.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -22,9 +23,9 @@ class _ReportPageState extends State<ReportPage>
   final FirebaseService _firebaseService = FirebaseService();
   Health health = Health();
   String _sleepDataString = "데이터 없음";
-  double _totalHours = 0.0;           // 총 수면 시간 (시간 단위)
-  DateTime? _sleepStartTime;          // 수면 시작 시간
-  DateTime? _sleepEndTime;            // 수면 종료 시간
+  double _totalHours = 0.0; // 총 수면 시간 (시간 단위)
+  DateTime? _sleepStartTime; // 수면 시작 시간
+  DateTime? _sleepEndTime; // 수면 종료 시간
   double _deepSleep = 0.0;
   Map<DateTime, double> _weeklySleep = {}; // 0~6: 주간 수면 시간
   bool _isLoading = true; // 데이터 로딩 상태
@@ -40,7 +41,6 @@ class _ReportPageState extends State<ReportPage>
   Future<void> _loadSleepData() async {
     final sleepInfo = await _healthService.fetchDailySleepData();
 
-
     setState(() {
       _sleepDataString = sleepInfo['sleepString'] ?? "데이터 없음";
       _totalHours = sleepInfo['totalHours'];
@@ -51,7 +51,7 @@ class _ReportPageState extends State<ReportPage>
     // ---------------- DB 저장 ----------------
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.newsaveSleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -61,6 +61,7 @@ class _ReportPageState extends State<ReportPage>
       );
     }
   }
+
   Future<void> _loadWeeklySleep() async {
     final firebaseService = FirebaseService();
     final data = await firebaseService.getWeeklySleep("test_user_123");
@@ -129,6 +130,41 @@ class _ReportPageState extends State<ReportPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              icon: const Icon(Icons.share, color: Colors.white),
+              onPressed: () {
+                final double lightSleepHours = (_totalHours - _deepSleep).clamp(
+                  0.0,
+                  _totalHours,
+                );
+                final today = DateTime.now();
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => SharePage(
+                          totalSleepHours: _totalHours,
+                          deepSleepHours: _deepSleep,
+                          lightSleepHours: lightSleepHours,
+                          dayOfWeek: DateFormat(
+                            'EEEE',
+                            'ko_KR',
+                          ).format(today), // '목요일' 같이 동적으로 요일 전달
+                          // 아래 값들은 현재 ReportPage에 없으므로 임시 값을 전달합니다.
+                          // 나중에 HealthKit 등에서 가져오면 변수로 교체하세요.
+                          sleepScore: 78,
+                          avgHeartRate: 98,
+                          sleepSatisfaction: "보통",
+                          sleepGoalPercent: 76,
+                        ),
+                  ),
+                );
+              },
+            ),
+          ),
           const SizedBox(height: 20),
 
           // Date Row (simple mockup)
@@ -234,83 +270,91 @@ class _ReportPageState extends State<ReportPage>
           ),
           const SizedBox(height: 20),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                :BarChart(
-              BarChartData(
-                gridData: FlGridData(show: false),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 40,
-                      getTitlesWidget: (value, _) {
-                        if (value == 0) {
-                          return const Text(
-                            "0h",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+            child:
+                _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : BarChart(
+                      BarChartData(
+                        gridData: FlGridData(show: false),
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 40,
+                              getTitlesWidget: (value, _) {
+                                if (value == 0) {
+                                  return const Text(
+                                    "0h",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }
+                                if (value == 2.5) {
+                                  return const Text(
+                                    "2h30m",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }
+                                if (value == 5) {
+                                  return const Text(
+                                    "5h",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }
+                                if (value == 7.5) {
+                                  return const Text(
+                                    "7h30m",
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
                             ),
-                          );
-                        }
-                        if (value == 2.5) {
-                          return const Text(
-                            "2h30m",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              getTitlesWidget: (value, _) {
+                                int index = value.toInt();
+                                DateTime date = weekStart.add(
+                                  Duration(days: index),
+                                );
+                                String label = DateFormat.E().format(
+                                  date,
+                                ); // 요일 표시 (Mon, Tue …)
+                                return Text(
+                                  label,
+                                  style: const TextStyle(color: Colors.white70),
+                                );
+                              },
                             ),
-                          );
-                        }
-                        if (value == 5) {
-                          return const Text(
-                            "5h",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          );
-                        }
-                        if (value == 7.5) {
-                          return const Text(
-                            "7h30m",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
+                          ),
+                          topTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        barGroups: List.generate(7, (i) {
+                          DateTime date = weekStart.add(Duration(days: i));
+                          double sleepHours = _weeklySleep[date] ?? 0.0;
+                          return _barData(i, sleepHours);
+                        }),
+                      ),
                     ),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, _) {
-                        int index = value.toInt();
-                        DateTime date = weekStart.add(Duration(days: index));
-                        String label = DateFormat.E().format(date); // 요일 표시 (Mon, Tue …)
-                        return Text(label, style: const TextStyle(color: Colors.white70));
-                      },
-                    ),
-                  ),
-                  topTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  rightTitles: AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                barGroups:  List.generate(7, (i) {
-                  DateTime date = weekStart.add(Duration(days: i));
-                  double sleepHours = _weeklySleep[date] ?? 0.0;
-                  return _barData(i, sleepHours);
-                }),
-              ),
-            ),
           ),
           const SizedBox(height: 20),
           _infoCard([

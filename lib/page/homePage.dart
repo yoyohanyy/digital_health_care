@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'letterPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // HomePage는 기존 코드에서 수정된 부분만 확인하시면 됩니다.
 class HomePage extends StatefulWidget {
@@ -22,6 +23,9 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+
+    _loadTimes();
+
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       setState(() {
         if (_timeLeft.inSeconds > 0) {
@@ -29,6 +33,32 @@ class _HomePageState extends State<HomePage> {
         }
       });
     });
+  }
+
+  // 👈 3. 저장된 시간을 불러오는 함수
+  Future<void> _loadTimes() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      // SharedPreferences에서 hour와 minute 값을 각각 불러옵니다.
+      // 저장된 값이 없을 경우(??), 기존의 초기값을 사용합니다.
+      final wakeUpHour = prefs.getInt('wakeUpHour') ?? _wakeUpTime.hour;
+      final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? _wakeUpTime.minute;
+      _wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
+
+      final bedTimeHour = prefs.getInt('bedTimeHour') ?? _bedTime.hour;
+      final bedTimeMinute = prefs.getInt('bedTimeMinute') ?? _bedTime.minute;
+      _bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
+    });
+  }
+
+  // 👈 4. 현재 설정된 시간을 기기에 저장하는 함수
+  Future<void> _saveTimes() async {
+    final prefs = await SharedPreferences.getInstance();
+    // TimeOfDay 객체는 직접 저장이 안되므로, hour와 minute를 정수(int)로 분리해서 저장합니다.
+    await prefs.setInt('wakeUpHour', _wakeUpTime.hour);
+    await prefs.setInt('wakeUpMinute', _wakeUpTime.minute);
+    await prefs.setInt('bedTimeHour', _bedTime.hour);
+    await prefs.setInt('bedTimeMinute', _bedTime.minute);
   }
 
   @override
@@ -69,6 +99,7 @@ class _HomePageState extends State<HomePage> {
                 _wakeUpTime = newWakeUpTime;
                 _bedTime = newBedTime;
               });
+              _saveTimes(); // 변경된 시간을 기기에 저장
             },
           ),
         );

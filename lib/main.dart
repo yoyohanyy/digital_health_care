@@ -3,14 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import './page/splashPage.dart'; // SplashPage import
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   KakaoSdk.init(nativeAppKey: '89d79c3a05dd0411019c1f7785ea4939');
+  await initializeDateFormatting('ko_KR', null); //한국어 형태의 날짜 받아들이기
   void printKeyHash() async {
     final keyHash = await KakaoSdk.origin;
     print("👉 Current Key Hash: $keyHash");
   }
+
   printKeyHash();
   try {
     await Firebase.initializeApp();

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+// 이 페이지에서 쓴 내용을 저장하고 불러오려면 flutter pub add shared_preferences 명령어로 패키지를 추가해야 합니다.
+import 'package:shared_preferences/shared_preferences.dart';
+
 class LetterPage extends StatefulWidget {
   const LetterPage({super.key});
 
@@ -11,6 +14,27 @@ class _LetterPageState extends State<LetterPage> {
   final TextEditingController _controller = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _loadLetter(); // 페이지가 시작될 때 저장된 편지 내용을 불러옵니다.
+  }
+
+  // 편지 내용을 불러오는 함수
+  void _loadLetter() async {
+    final prefs = await SharedPreferences.getInstance();
+    // 'letter' 키로 저장된 문자열을 불러옵니다. 없으면 빈 문자열을 사용합니다.
+    final String savedLetter = prefs.getString('letter') ?? '';
+    _controller.text = savedLetter;
+  }
+
+  // 편지 내용을 저장하는 함수
+  void _saveLetter(String content) async {
+    final prefs = await SharedPreferences.getInstance();
+    // 'letter'라는 키(key)에 content(편지 내용)를 저장합니다.
+    await prefs.setString('letter', content);
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -18,7 +42,6 @@ class _LetterPageState extends State<LetterPage> {
 
   @override
   Widget build(BuildContext context) {
-    // HomePage와 동일한 배경색 및 테마 적용
     return Scaffold(
       backgroundColor: const Color(0xFF1A202C),
       appBar: AppBar(
@@ -28,16 +51,8 @@ class _LetterPageState extends State<LetterPage> {
         ),
         backgroundColor: const Color(0xFF1A202C),
         elevation: 0,
-        // 뒤로가기 아이콘 색상 변경
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-            onPressed: () {
-              // TODO: 채팅 아이콘 클릭 시 동작
-            },
-          ),
-        ],
+        // actions 리스트에서 채팅 아이콘을 제거했습니다.
       ),
       body: Padding(
         padding: const EdgeInsets.all(20.0),
@@ -49,13 +64,12 @@ class _LetterPageState extends State<LetterPage> {
               style: TextStyle(color: Colors.white70, fontSize: 16),
             ),
             const SizedBox(height: 16),
-            // Expanded를 사용하여 TextField가 남은 공간을 모두 차지하도록 함
             Expanded(
               child: TextField(
                 controller: _controller,
-                maxLines: null, // 여러 줄 입력 가능
-                expands: true, // 부모 위젯의 공간을 모두 차지
-                textAlignVertical: TextAlignVertical.top, // 커서를 위에서부터 시작
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
                 style: const TextStyle(color: Colors.white, fontSize: 14),
                 decoration: InputDecoration(
                   hintText: "내용을 입력하세요...",
@@ -87,8 +101,14 @@ class _LetterPageState extends State<LetterPage> {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  // TODO: 저장하기 버튼 클릭 시 동작
-                  Navigator.pop(context); // 현재 페이지 닫고 이전 화면으로 돌아가기
+                  // 1. 컨트롤러에서 현재 입력된 텍스트를 가져옵니다.
+                  final String currentText = _controller.text;
+
+                  // 2. 해당 텍스트를 기기에 저장합니다.
+                  _saveLetter(currentText);
+
+                  // 3. 현재 페이지를 닫고 이전 화면으로 돌아갑니다.
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D3748),
