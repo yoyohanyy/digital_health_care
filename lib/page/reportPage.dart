@@ -30,6 +30,7 @@ class _ReportPageState extends State<ReportPage>
   double _deepSleep = 0.0;
   Map<DateTime, double> _weeklySleep = {};
   bool _isLoading = true;
+  int _currentTabIndex = 0;
 
   // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
@@ -39,6 +40,14 @@ class _ReportPageState extends State<ReportPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // ✅ 탭 컨트롤러에 리스너 추가
+    _tabController.addListener(() {
+      // 탭이 변경될 때마다 상태를 업데이트하여 UI를 다시 그리도록 함
+      setState(() {
+        _currentTabIndex = _tabController.index;
+      });
+    });
 
     // ✅ Initialize the current week (Sunday as start)
     _currentWeekStart = _getStartOfWeek(_selectedDate);
@@ -138,6 +147,41 @@ class _ReportPageState extends State<ReportPage>
           "리포트",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
+
+        actions: [
+          // '일간' 탭(인덱스 0)일 때만 공유 아이콘을 표시합니다.
+          if (_currentTabIndex == 0)
+            IconButton(
+              icon: const Icon(Icons.share, color: Colors.white),
+              onPressed: () {
+                final double lightSleepHours = (_totalHours - _deepSleep).clamp(
+                  0.0,
+                  _totalHours,
+                );
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => SharePage(
+                          totalSleepHours: _totalHours,
+                          deepSleepHours: _deepSleep,
+                          lightSleepHours: lightSleepHours,
+                          dayOfWeek: DateFormat(
+                            'EEEE',
+                            'ko_KR',
+                          ).format(_selectedDate),
+                          sleepScore: 78,
+                          avgHeartRate: 98,
+                          sleepSatisfaction: "보통",
+                          sleepGoalPercent: 76,
+                        ),
+                  ),
+                );
+              },
+            ),
+        ],
+
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: "일간"), Tab(text: "주간"), Tab(text: "월간")],
@@ -167,38 +211,6 @@ class _ReportPageState extends State<ReportPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              icon: const Icon(Icons.share, color: Colors.white),
-              onPressed: () {
-                final double lightSleepHours = (_totalHours - _deepSleep).clamp(
-                  0.0,
-                  _totalHours,
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => SharePage(
-                          totalSleepHours: _totalHours,
-                          deepSleepHours: _deepSleep,
-                          lightSleepHours: lightSleepHours,
-                          dayOfWeek: DateFormat(
-                            'EEEE',
-                            'ko_KR',
-                          ).format(_selectedDate),
-                          sleepScore: 78,
-                          avgHeartRate: 98,
-                          sleepSatisfaction: "보통",
-                          sleepGoalPercent: 76,
-                        ),
-                  ),
-                );
-              },
-            ),
-          ),
           const SizedBox(height: 20),
 
           // 🗓 Dynamic Date Row
