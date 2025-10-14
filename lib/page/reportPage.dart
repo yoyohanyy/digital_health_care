@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -5,6 +6,8 @@ import 'package:health/health.dart';
 import 'package:intl/intl.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../DTO/sleepRecordDTO.dart';
+import '../provider/sleepProvider.dart';
 import '../services/healthService.dart';
 import '../services/firebaseService.dart';
 import 'sharePage.dart';
@@ -56,7 +59,12 @@ class _ReportPageState extends State<ReportPage>
 
     // ✅ Load sleep data
     _loadSleepDataForDate(_selectedDate);
-    _loadWeeklySleep();
+    //_loadWeeklySleep();
+
+    // Firebase 데이터 불러오기
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _loadSleepRecords();
+    });
   }
 
   // Helper to get start of the week (Sunday)
@@ -90,30 +98,17 @@ class _ReportPageState extends State<ReportPage>
     }
   }
 
-  Future<void> _loadWeeklySleep() async {
-    final data = await _firebaseService.getWeeklySleep("test_user_123");
-    debugPrint("📊 주간 수면 데이터: $data");
+  Future<void> _loadSleepRecords() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final sleepProvider = Provider.of<SleepRecordProvider>(
+        context, listen: false);
+    await sleepProvider.fetchRecords(
+        userProvider.user!.id, days: 30); // 최근 30일 데이터 로드
     setState(() {
-      _weeklySleep = data as Map<DateTime, double>;
       _isLoading = false;
     });
   }
 
-  Future<void> _saveSleepData() async {
-    if (_sleepStartTime != null && _sleepEndTime != null) {
-      await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
-        {
-          'startTime': _sleepStartTime,
-          'endTime': _sleepEndTime,
-          'totalMinutes': _totalHours * 60,
-          'deepSleep': _deepSleep,
-        },
-      );
-    } else {
-      debugPrint("⚠️ 수면 데이터가 준비되지 않았습니다.");
-    }
-  }
 
   void _goToPreviousWeek() {
     setState(() {
@@ -143,6 +138,51 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
+    final sleepProvider = Provider.of<SleepRecordProvider>(context);
+    final records = sleepProvider.records;
+    // 🆕 오늘 record 찾기, 없으면 더미 데이터 생성
+    final today = _selectedDate;
+    SleepRecord todayRecord = records.firstWhere(
+          (r) =>
+      r.date.year == today.year &&
+          r.date.month == today.month &&
+          r.date.day == today.day,
+      orElse: () => SleepRecord(
+        date: today,
+        startTime: today,
+        endTime: today,
+        totalHours: 0,
+        deepSleep: 0,
+        satisfaction: 0,
+        feedback: '데이터 없음',
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      ),
+    );
+
+    // 🆕 주간 데이터 Map
+    Map<DateTime, double> weeklySleep = {};
+    for (int i = 0; i < 7; i++) {
+      DateTime day = _currentWeekStart.add(Duration(days: i));
+      final r = records.firstWhere(
+            (rec) =>
+        rec.date.year == day.year &&
+            rec.date.month == day.month &&
+            rec.date.day == day.day,
+        orElse: () => SleepRecord(
+          date: day,
+          startTime: day,
+          endTime: day,
+          totalHours: 0,
+          deepSleep: 0,
+          satisfaction: 0,
+          feedback: '데이터 없음',
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        ),
+      );
+      weeklySleep[day] = r.totalHours.toDouble();
+    }
    // ✅ 로그인된 사용자 정보
     return Scaffold(
       appBar: AppBar(
@@ -195,8 +235,8 @@ class _ReportPageState extends State<ReportPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildDailyReport(),
-          _buildWeeklyReport(),
+          _buildDailyReport(todayRecord),
+          _buildWeeklyReport(weeklySleep),
           _buildMonthlyReport(),
         ],
       ),
@@ -204,7 +244,7 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Daily Report ----------------
-  Widget _buildDailyReport() {
+  Widget _buildDailyReport(SleepRecord todayRecord) {
     List<DateTime> weekDays = List.generate(
       7,
       (i) => _currentWeekStart.add(Duration(days: i)),
@@ -321,7 +361,7 @@ class _ReportPageState extends State<ReportPage>
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
             _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
-            _infoRow("실제 수면 시간", _sleepDataString),
+            _infoRow("실제 수면 시간", "${todayRecord.totalHours}시간"),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
 
@@ -345,7 +385,7 @@ class _ReportPageState extends State<ReportPage>
           const SizedBox(height: 20),
 
           ElevatedButton(
-            onPressed: _saveSleepData,
+            onPressed: /*_saveSleepData,*/ null,
             child: const Text("저장", style: TextStyle(fontSize: 16)),
           ),
         ],
@@ -354,8 +394,8 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Weekly Report ----------------
-  Widget _buildWeeklyReport() {
-    DateTime weekStart = DateTime.now().subtract(Duration(days: 6));
+  Widget _buildWeeklyReport(Map<DateTime, double> weeklySleep) {
+    DateTime weekStart = _currentWeekStart;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -444,7 +484,7 @@ class _ReportPageState extends State<ReportPage>
                         borderData: FlBorderData(show: false),
                         barGroups: List.generate(7, (i) {
                           DateTime date = weekStart.add(Duration(days: i));
-                          double sleepHours = _weeklySleep[date] ?? 0.0;
+                          double sleepHours = weeklySleep[date] ?? 0.0;
                           return _barData(i, sleepHours);
                         }),
                       ),
