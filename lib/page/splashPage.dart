@@ -62,6 +62,8 @@ class _SplashPageState extends State<SplashPage> {
    Provider.of<UserProvider>(context, listen: false).setUser(
      udto.User(
        id: userId,
+       authCode: '', // 필요 시 카카오 인증 코드 저장 로직 추가
+       chatbotId: data['chatbotId'] ?? '',
        nickname: data['nickname'] ?? '',
        profileImage: data['profileImage'] ?? '',
        sleepStartTime: data['sleepStartTime'] ?? '22:00',
