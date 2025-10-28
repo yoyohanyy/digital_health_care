@@ -4,7 +4,7 @@ class SleepRecord {
   final DateTime date;
   final DateTime startTime;
   final DateTime endTime;
-  final int totalHours;
+  final double totalHours;
   final int deepSleep;
   final int satisfaction;
   final String feedback;
@@ -26,8 +26,12 @@ class SleepRecord {
   factory SleepRecord.fromMap(Map<String, dynamic> map) {
     return SleepRecord(
       date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      startTime: (map['sleepInfo']['startTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      endTime: (map['sleepInfo']['endTime'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      startTime:
+          (map['sleepInfo']['startTime'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
+      endTime:
+          (map['sleepInfo']['endTime'] as Timestamp?)?.toDate() ??
+          DateTime.now(),
       totalHours: map['sleepInfo']?['totalHours'] ?? 0,
       deepSleep: map['sleepInfo']?['deepSleep'] ?? 0,
       satisfaction: map['satisfaction'] ?? 0,

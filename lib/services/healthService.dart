@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 
 class HealthService {
@@ -10,8 +9,9 @@ class HealthService {
     _health.configure();
   }
 
-  /// Health Connect 설치 안내
+  /// Android only: Health Connect 설치 안내
   Future<void> installHealthConnect() async {
+    if (!Platform.isAndroid) return;
     try {
       await _health.installHealthConnect();
       debugPrint("Health Connect 설치 안내 완료");
@@ -20,7 +20,21 @@ class HealthService {
     }
   }
 
-  /// iOS/Android 수면 데이터 타입 정의
+  /// Android only: SDK 상태 확인
+  Future<bool> getSdkStatus() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      debugPrint('SDK 상태 확인 중...');
+      final status = await _health.getHealthConnectSdkStatus();
+      debugPrint('SDK 상태: $status');
+      return status == HealthConnectSdkStatus.sdkAvailable;
+    } catch (e) {
+      debugPrint('SDK 상태 확인 실패: $e');
+      return false;
+    }
+  }
+
+  /// 수면 데이터 타입 정의 (Android/iOS)
   List<HealthDataType> get types =>
       Platform.isAndroid
           ? [
@@ -41,46 +55,34 @@ class HealthService {
             HealthDataType.SLEEP_REM,
           ];
 
-  /// READ + WRITE 권한 설정
+  /// READ + WRITE 권한
   List<HealthDataAccess> get permissions =>
       List.generate(types.length, (_) => HealthDataAccess.READ_WRITE);
 
-  /// 권한 확인 및 요청
+  /// 권한 확인 및 요청 (Android + iOS)
   Future<void> authorize() async {
-    bool? hasPermissions = await _health.hasPermissions(
-      types,
-      permissions: permissions,
-    );
+    try {
+      bool? hasPermissions = await _health.hasPermissions(
+        types,
+        permissions: permissions,
+      );
 
-    if (hasPermissions != true) {
-      try {
+      if (hasPermissions != true) {
         bool authorized = await _health.requestAuthorization(
           types,
           permissions: permissions,
         );
-        if (authorized) {
-          debugPrint("수면 데이터 READ/WRITE 권한 허용됨");
-        } else {
-          debugPrint("수면 데이터 권한 거부됨");
-        }
-      } catch (error) {
-        debugPrint("권한 요청 중 오류: $error");
-      }
-    } else {
-      debugPrint("이미 수면 데이터 권한 있음");
-    }
-  }
 
-  /// Health Connect SDK 상태 확인
-  Future<bool> getSdkStatus() async {
-    try {
-      debugPrint('SDK 상태 확인 중...');
-      final status = await _health.getHealthConnectSdkStatus();
-      debugPrint('SDK 상태: $status');
-      return status == HealthConnectSdkStatus.sdkAvailable;
-    } catch (e) {
-      debugPrint('SDK 상태 확인 실패: $e');
-      return false;
+        if (authorized) {
+          debugPrint("Health 권한 허용됨");
+        } else {
+          debugPrint("Health 권한 거부됨");
+        }
+      } else {
+        debugPrint("이미 Health 권한 있음");
+      }
+    } catch (error) {
+      debugPrint("권한 요청 중 오류: $error");
     }
   }
 
@@ -92,21 +94,20 @@ class HealthService {
     start ??= DateTime.now().subtract(const Duration(days: 1));
     end ??= DateTime.now();
     try {
-      final sleepData = await _health.getHealthDataFromTypes(
+      return await _health.getHealthDataFromTypes(
         startTime: start,
         endTime: end,
         types: types,
       );
-      return sleepData;
     } catch (e) {
       debugPrint('수면 데이터 가져오기 실패: $e');
       return [];
     }
   }
 
-  /// 하루 전체 수면 시간 문자열과 총 수면 정보를 반환 (어제~오늘)
+  /// 하루 전체 수면 시간 계산
   Future<Map<String, dynamic>> fetchDailySleepData() async {
-    await authorize(); // 권한 요청
+    await authorize();
 
     List<HealthDataPoint> sleepData = await getSleepData();
 
@@ -130,8 +131,7 @@ class HealthService {
       if (point.type == HealthDataType.SLEEP_SESSION) {
         final start = point.dateFrom.toLocal();
         final end = point.dateTo.toLocal();
-        final duration = end.difference(start).inMinutes;
-        totalMinutes += duration;
+        totalMinutes += end.difference(start).inMinutes;
 
         if (firstStart == null || start.isBefore(firstStart))
           firstStart = start;
@@ -146,7 +146,6 @@ class HealthService {
 
     int hours = totalMinutes ~/ 60;
     int minutes = totalMinutes % 60;
-
     String sleepString =
         totalMinutes == 0
             ? "데이터 없음"
@@ -162,9 +161,9 @@ class HealthService {
     };
   }
 
-  /// ✅ 특정 날짜의 수면 데이터 가져오기
+  /// 특정 날짜의 수면 데이터 가져오기
   Future<Map<String, dynamic>> fetchDailySleepDataForDate(DateTime date) async {
-    await authorize(); // 권한 요청
+    await authorize();
 
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = startOfDay.add(const Duration(days: 1));
@@ -192,8 +191,7 @@ class HealthService {
       if (point.type == HealthDataType.SLEEP_SESSION) {
         final start = point.dateFrom.toLocal();
         final end = point.dateTo.toLocal();
-        final duration = end.difference(start).inMinutes;
-        totalMinutes += duration;
+        totalMinutes += end.difference(start).inMinutes;
 
         if (firstStart == null || start.isBefore(firstStart))
           firstStart = start;
@@ -208,7 +206,6 @@ class HealthService {
 
     int hours = totalMinutes ~/ 60;
     int minutes = totalMinutes % 60;
-
     String sleepString =
         totalMinutes == 0
             ? "데이터 없음"

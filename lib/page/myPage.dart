@@ -38,13 +38,19 @@ class MyPage extends StatelessWidget {
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.grey,
-                    backgroundImage: (user?.profileImage != null &&
-                        user!.profileImage.isNotEmpty)
-                        ? NetworkImage(user.profileImage)
-                        : null,
-                    child: (user == null || user.profileImage.isEmpty)
-                        ? const Icon(Icons.person, size: 40, color: Colors.white)
-                        : null,
+                    backgroundImage:
+                        (user?.profileImage != null &&
+                                user!.profileImage.isNotEmpty)
+                            ? NetworkImage(user.profileImage)
+                            : null,
+                    child:
+                        (user == null || user.profileImage.isEmpty)
+                            ? const Icon(
+                              Icons.person,
+                              size: 40,
+                              color: Colors.white,
+                            )
+                            : null,
                   ),
                   const SizedBox(width: 16),
 
@@ -65,14 +71,18 @@ class MyPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // Options
             _menuTile(context, "건강 데이터 연동하기"),
             _menuTile(context, "카카오 챗봇 연결하기"),
             _menuTile(context, "알림 설정?"),
             _menuTile(context, "앱 정보"),
             _menuTile(context, "약관 및 정책"),
-            _menuTile(context, "로그아웃", onTap: () => _logout(context)),
+            _menuTile(
+              context,
+              "로그아웃",
+              onTap: () => _kakaoService.logout(context),
+            ),
             _menuTile(context, "탈퇴하기", isDestructive: true),
           ],
         ),
@@ -109,23 +119,5 @@ class MyPage extends StatelessWidget {
             },
       ),
     );
-  }
-
-  Future<void> _logout(BuildContext context) async {
-    try {
-      await _kakaoService.logout(); // Log out from Kakao
-      if (!context.mounted) return;
-      // Navigate back to LoginPage
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
-        (route) => false,
-      );
-    } catch (e) {
-      // Handle errors (optional)
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("로그아웃 실패: $e")));
-    }
   }
 }

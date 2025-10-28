@@ -77,9 +77,8 @@ class _ReportPageState extends State<ReportPage>
     });
 
     if (_sleepStartTime != null && _sleepEndTime != null) {
-
       await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -91,10 +90,22 @@ class _ReportPageState extends State<ReportPage>
   }
 
   Future<void> _loadWeeklySleep() async {
-    final data = await _firebaseService.getWeeklySleep("test_user_123");
-    debugPrint("📊 주간 수면 데이터: $data");
+    final records = await _firebaseService.getWeeklySleep("test_user_123");
+    debugPrint("📊 주간 수면 데이터: $records");
+
+    final Map<DateTime, double> weeklyMap = {};
+
+    for (var record in records) {
+      final dateKey = DateTime(
+        record.date.year,
+        record.date.month,
+        record.date.day,
+      );
+      weeklyMap[dateKey] = record.totalHours;
+    }
+
     setState(() {
-      _weeklySleep = data as Map<DateTime, double>;
+      _weeklySleep = weeklyMap;
       _isLoading = false;
     });
   }
@@ -102,7 +113,7 @@ class _ReportPageState extends State<ReportPage>
   Future<void> _saveSleepData() async {
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveTodaySleepData(
-        "test_user_123",  // 실제 로그인한 userId로 교체
+        "test_user_123", // 실제 로그인한 userId로 교체
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -143,7 +154,7 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
-   // ✅ 로그인된 사용자 정보
+    // ✅ 로그인된 사용자 정보
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),

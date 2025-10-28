@@ -1,6 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:health_care_app/page/loginPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import '../page/loginPage.dart'; // <-- Make sure the path is correct
 
 class KakaoService {
   /// 로그인 상태 확인
@@ -53,15 +56,32 @@ class KakaoService {
     return false;
   }
 
-  /// 로그아웃
-  Future<void> logout() async {
+  /// 로그아웃 (BuildContext 필요)
+  Future<void> logout(BuildContext context) async {
     try {
+      // 1️⃣ Kakao 로그아웃
       await UserApi.instance.logout();
+
+      // 2️⃣ SharedPreferences에서 토큰 삭제
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('kakaoToken');
+
       print("로그아웃 완료");
+
+      // 3️⃣ 로그인 페이지로 이동
+      if (!context.mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+        (route) => false,
+      );
     } catch (e) {
       print("로그아웃 실패: $e");
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("로그아웃 실패: $e")));
+      }
     }
   }
 
@@ -78,8 +98,8 @@ class KakaoService {
         'nickname': nickname,
         'profileImage': profileImage,
         'lastLogin': DateTime.now(),
-        'sleepStartTime': '22:00',         // 기본값 설정
-        'recommendedWakeUpTime': '06:00',  // 기본값 설정
+        'sleepStartTime': '22:00', // 기본값 설정
+        'recommendedWakeUpTime': '06:00', // 기본값 설정
       }, SetOptions(merge: true));
 
       print("✅ 사용자 정보 저장 완료");
