@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -5,11 +6,15 @@ import 'package:health/health.dart';
 import 'package:intl/intl.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../DTO/sleepRecordDTO.dart';
+import '../provider/sleepProvider.dart';
 import '../services/healthService.dart';
 import '../services/firebaseService.dart';
 import 'sharePage.dart';
 import '../provider/userProvider.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
@@ -33,10 +38,12 @@ class _ReportPageState extends State<ReportPage>
   Map<DateTime, double> _weeklySleep = {};
   bool _isLoading = true;
   int _currentTabIndex = 0;
+  String _targetSleepTimeString = "00:00 AM - 00:00 AM";
 
   // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentWeekStart;
+  double _targetSleepDurationHours = 8.0; //목표 수면 시간을 저장할 곳
 
   @override
   void initState() {
@@ -56,13 +63,57 @@ class _ReportPageState extends State<ReportPage>
 
     // ✅ Load sleep data
     _loadSleepDataForDate(_selectedDate);
-    _loadWeeklySleep();
+
+    // Firebase 데이터 불러오기
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _loadSleepRecords();
+      _loadTargetSleepTime();
+    });
   }
 
   // Helper to get start of the week (Sunday)
   DateTime _getStartOfWeek(DateTime date) {
     // weekday: Monday=1, Sunday=7 → Sunday start = subtract weekday % 7
     return date.subtract(Duration(days: date.weekday % 7));
+  }
+
+  Future<void> _loadTargetSleepTime() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // 저장된 값이 없으면 기본값 사용
+    final wakeUpHour = prefs.getInt('wakeUpHour') ?? 8;
+    final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? 0;
+    final bedTimeHour = prefs.getInt('bedTimeHour') ?? 0;
+    final bedTimeMinute = prefs.getInt('bedTimeMinute') ?? 0;
+
+    final wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
+    final bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
+
+    // ✅ 목표 수면 시간(분) 계산
+    int bedTimeInMinutes = bedTime.hour * 60 + bedTime.minute;
+    int wakeUpTimeInMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
+
+    int durationInMinutes;
+
+    // 취침 시간이 기상 시간보다 늦으면 (예: 23시 취침, 07시 기상)
+    if (bedTimeInMinutes > wakeUpTimeInMinutes) {
+      durationInMinutes = (24 * 60 - bedTimeInMinutes) + wakeUpTimeInMinutes;
+    } else {
+      durationInMinutes = wakeUpTimeInMinutes - bedTimeInMinutes;
+    }
+
+    setState(() {
+      _targetSleepTimeString =
+          '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+
+      _targetSleepDurationHours = durationInMinutes / 60.0;
+    });
+  }
+
+  String _formatTimeOfDay(TimeOfDay tod) {
+    final now = DateTime.now();
+    final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
+    return DateFormat('hh:mm a', 'en_US').format(dt);
   }
 
   Future<void> _loadSleepDataForDate(DateTime date) async {
@@ -126,6 +177,21 @@ class _ReportPageState extends State<ReportPage>
     }
   }
 
+  Future<void> _loadSleepRecords() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    final sleepProvider = Provider.of<SleepRecordProvider>(
+      context,
+      listen: false,
+    );
+    await sleepProvider.fetchRecords(
+      userProvider.user!.id,
+      days: 30,
+    ); // 최근 30일 데이터 로드
+    setState(() {
+      _isLoading = false;
+    });
+  }
+
   void _goToPreviousWeek() {
     setState(() {
       _currentWeekStart = _currentWeekStart.subtract(const Duration(days: 7));
@@ -154,7 +220,53 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Main ----------------
   @override
   Widget build(BuildContext context) {
-    // ✅ 로그인된 사용자 정보
+    final sleepProvider = Provider.of<SleepRecordProvider>(context);
+    final records = sleepProvider.records;
+    // 🆕 오늘 record 찾기, 없으면 더미 데이터 생성
+    final today = _selectedDate;
+    SleepRecord todayRecord = records.firstWhere(
+      (r) =>
+          r.date.year == today.year &&
+          r.date.month == today.month &&
+          r.date.day == today.day,
+      orElse:
+          () => SleepRecord(
+            date: today,
+            startTime: today,
+            endTime: today,
+            totalHours: 0,
+            deepSleep: 0,
+            satisfaction: 0,
+            feedback: '데이터 없음',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          ),
+    );
+
+    // 🆕 주간 데이터 Map
+    Map<DateTime, double> weeklySleep = {};
+    for (int i = 0; i < 7; i++) {
+      DateTime day = _currentWeekStart.add(Duration(days: i));
+      final r = records.firstWhere(
+        (rec) =>
+            rec.date.year == day.year &&
+            rec.date.month == day.month &&
+            rec.date.day == day.day,
+        orElse:
+            () => SleepRecord(
+              date: day,
+              startTime: day,
+              endTime: day,
+              totalHours: 0,
+              deepSleep: 0,
+              satisfaction: 0,
+              feedback: '데이터 없음',
+              createdAt: Timestamp.now(),
+              updatedAt: Timestamp.now(),
+            ),
+      );
+      weeklySleep[day] = r.totalHours.toDouble();
+    }
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),
@@ -206,8 +318,8 @@ class _ReportPageState extends State<ReportPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildDailyReport(),
-          _buildWeeklyReport(),
+          _buildDailyReport(todayRecord),
+          _buildWeeklyReport(weeklySleep),
           _buildMonthlyReport(),
         ],
       ),
@@ -215,11 +327,23 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Daily Report ----------------
-  Widget _buildDailyReport() {
+  Widget _buildDailyReport(SleepRecord todayRecord) {
     List<DateTime> weekDays = List.generate(
       7,
       (i) => _currentWeekStart.add(Duration(days: i)),
     );
+
+    // ✅ 수면 목표 달성률 계산
+    // _targetSleepDurationHours가 0보다 클 때만 계산 (0으로 나누기 방지)
+    final double sleepPercent =
+        (_targetSleepDurationHours > 0)
+            ? (_totalHours / _targetSleepDurationHours).clamp(
+              0.0,
+              1.0,
+            ) // 0.0과 1.0 사이 값으로 제한
+            : 0.0;
+
+    final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -317,9 +441,9 @@ class _ReportPageState extends State<ReportPage>
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
-            percent: 0.76,
-            center: const Text(
-              "76%",
+            percent: sleepPercent,
+            center: Text(
+              percentText,
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             progressColor: Color(0xFFAEC6CF),
@@ -331,8 +455,8 @@ class _ReportPageState extends State<ReportPage>
 
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
-            _infoRow("목표 수면 시간", "00:30 AM - 8:00 AM"),
-            _infoRow("실제 수면 시간", _sleepDataString),
+            _infoRow("목표 수면 시간", _targetSleepTimeString),
+            _infoRow("실제 수면 시간", "${todayRecord.totalHours}시간"),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
 
@@ -356,7 +480,7 @@ class _ReportPageState extends State<ReportPage>
           const SizedBox(height: 20),
 
           ElevatedButton(
-            onPressed: _saveSleepData,
+            onPressed: /*_saveSleepData,*/ null,
             child: const Text("저장", style: TextStyle(fontSize: 16)),
           ),
         ],
@@ -365,8 +489,8 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Weekly Report ----------------
-  Widget _buildWeeklyReport() {
-    DateTime weekStart = DateTime.now().subtract(Duration(days: 6));
+  Widget _buildWeeklyReport(Map<DateTime, double> weeklySleep) {
+    DateTime weekStart = _currentWeekStart;
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -455,7 +579,7 @@ class _ReportPageState extends State<ReportPage>
                         borderData: FlBorderData(show: false),
                         barGroups: List.generate(7, (i) {
                           DateTime date = weekStart.add(Duration(days: i));
-                          double sleepHours = _weeklySleep[date] ?? 0.0;
+                          double sleepHours = weeklySleep[date] ?? 0.0;
                           return _barData(i, sleepHours);
                         }),
                       ),
