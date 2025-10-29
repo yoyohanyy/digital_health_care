@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 // 이 페이지에서 쓴 내용을 저장하고 불러오려면 flutter pub add shared_preferences 명령어로 패키지를 추가해야 합니다.
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:provider/provider.dart';
+import '../provider/userProvider.dart';
+import '../services/firebaseService.dart';
+
 class LetterPage extends StatefulWidget {
   const LetterPage({super.key});
 
@@ -12,6 +16,8 @@ class LetterPage extends StatefulWidget {
 
 class _LetterPageState extends State<LetterPage> {
   final TextEditingController _controller = TextEditingController();
+
+  final FirebaseService _firebaseService = FirebaseService();
 
   @override
   void initState() {
@@ -100,15 +106,47 @@ class _LetterPageState extends State<LetterPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
                   // 1. 컨트롤러에서 현재 입력된 텍스트를 가져옵니다.
                   final String currentText = _controller.text;
 
                   // 2. 해당 텍스트를 기기에 저장합니다.
                   _saveLetter(currentText);
 
-                  // 3. 현재 페이지를 닫고 이전 화면으로 돌아갑니다.
-                  Navigator.pop(context);
+                  try {
+                    final userProvider = Provider.of<UserProvider>(
+                      context,
+                      listen: false,
+                    );
+
+                    // 3-1. 로그인한 사용자 ID 확인
+                    if (userProvider.user == null) {
+                      print("사용자 정보가 없어 Firebase에 저장할 수 없습니다.");
+                      // 페이지 닫기 로직은 계속 수행
+                    } else {
+                      final String userId = userProvider.user!.id;
+
+                      // 3-2. 요청하신 'replyYesterdayMessage' 키로 데이터 맵 생성
+                      final Map<String, dynamic> letterData = {
+                        'replyYesterdayMessage': currentText,
+                      };
+
+                      // 3-3. ReportPage에서 사용한 '오늘의 데이터 저장' 함수 호출
+                      // 이 함수가 오늘의 날짜 문서에 데이터를 추가(병합)한다고 가정합니다.
+                      await _firebaseService.saveTodaySleepData(
+                        userId,
+                        letterData,
+                      );
+                    }
+                  } catch (e) {
+                    // Firebase 저장 실패 시 에러 출력 (알림 없음)
+                    print("Firebase 편지 저장 실패: $e");
+                  }
+
+                  // 4. (기존 로직) 현재 페이지를 닫고 이전 화면으로 돌아갑니다.
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D3748),

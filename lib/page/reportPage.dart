@@ -80,13 +80,14 @@ class _ReportPageState extends State<ReportPage>
 
     int bedTimeMinutes = bedTime.hour * 60 + bedTime.minute;
     int wakeUpMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
-    int duration = bedTimeMinutes > wakeUpMinutes
-        ? (24 * 60 - bedTimeMinutes) + wakeUpMinutes
-        : wakeUpMinutes - bedTimeMinutes;
+    int duration =
+        bedTimeMinutes > wakeUpMinutes
+            ? (24 * 60 - bedTimeMinutes) + wakeUpMinutes
+            : wakeUpMinutes - bedTimeMinutes;
 
     setState(() {
       _targetSleepTimeString =
-      '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+          '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
       _targetSleepDurationHours = duration / 60.0;
     });
   }
@@ -107,7 +108,7 @@ class _ReportPageState extends State<ReportPage>
       _sleepEndTime = sleepInfo['endTime'];
       _deepSleep = sleepInfo['deepSleep'];
     });
-
+    /* 버튼을 누를 시 저장이 되게 하는 것이 오류가 없을 듯 합니다.
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveTodaySleepData(
         "test_user_123",
@@ -118,6 +119,43 @@ class _ReportPageState extends State<ReportPage>
           'deepSleep': _deepSleep,
         },
       );
+    }
+  */
+  }
+
+  // ------------------- Firebase 저장 함수 (신규 추가) -------------------
+  Future<void> _saveSleepDataToFirebase() async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+    // 1. 로그인한 사용자 ID 가져오기
+    if (userProvider.user == null) {
+      return;
+    }
+    String userId = userProvider.user!.id;
+
+    // 2. 저장할 HealthService 데이터가 있는지 확인
+    if (_sleepStartTime != null && _sleepEndTime != null) {
+      // 3. 저장할 데이터 맵 구성
+      // (기존 _loadSleepDataForDate의 주석 처리된 로직과 동일하게 구성)
+      final Map<String, dynamic> sleepData = {
+        'startTime': _sleepStartTime,
+        'endTime': _sleepEndTime,
+        'totalMinutes': _totalHours * 60,
+        'deepSleep': _deepSleep, // 요청하신 대로 'deepSleep' 명칭 사용
+      };
+
+      try {
+        // 4. Firebase 서비스 호출
+        await _firebaseService.saveTodaySleepData(userId, sleepData);
+        // 6. (중요) 저장 후 최신 데이터를 다시 불러옵니다.
+        // 이렇게 하면 주간/월간 탭의 데이터도 즉시 새로고침됩니다.
+        await _loadSleepRecords();
+      } catch (e) {
+        // 7. 실패 피드백
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("데이터 저장에 실패했습니다: $e")));
+      }
     }
   }
 
@@ -168,7 +206,7 @@ class _ReportPageState extends State<ReportPage>
 
     // 오늘 record 가져오기
     final todayRecord = records.firstWhere(
-          (r) => _isSameDay(r.date, _selectedDate),
+      (r) => _isSameDay(r.date, _selectedDate),
       orElse: () => SleepRecord.empty(_selectedDate),
     );
 
@@ -177,7 +215,7 @@ class _ReportPageState extends State<ReportPage>
     for (int i = 0; i < 7; i++) {
       DateTime day = _currentWeekStart.add(Duration(days: i));
       final r = records.firstWhere(
-            (rec) => _isSameDay(rec.date, day),
+        (rec) => _isSameDay(rec.date, day),
         orElse: () => SleepRecord.empty(day),
       );
       weeklySleep[day] = r.totalHours.toDouble();
@@ -215,11 +253,19 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Daily Report ----------------
-  Widget _buildDailyReport(SleepRecord todayRecord, Map<DateTime, double> weeklySleep) {
-    List<DateTime> weekDays = List.generate(7, (i) => _currentWeekStart.add(Duration(days: i)));
+  Widget _buildDailyReport(
+    SleepRecord todayRecord,
+    Map<DateTime, double> weeklySleep,
+  ) {
+    List<DateTime> weekDays = List.generate(
+      7,
+      (i) => _currentWeekStart.add(Duration(days: i)),
+    );
 
     final double sleepPercent =
-    (_targetSleepDurationHours > 0) ? (_totalHours / _targetSleepDurationHours).clamp(0.0, 1.0) : 0.0;
+        (_targetSleepDurationHours > 0)
+            ? (_totalHours / _targetSleepDurationHours).clamp(0.0, 1.0)
+            : 0.0;
     final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
 
     return SingleChildScrollView(
@@ -231,7 +277,10 @@ class _ReportPageState extends State<ReportPage>
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(icon: const Icon(Icons.chevron_left, color: Colors.white54), onPressed: _goToPreviousWeek),
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: Colors.white54),
+                onPressed: _goToPreviousWeek,
+              ),
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -246,8 +295,14 @@ class _ReportPageState extends State<ReportPage>
                               Text(
                                 DateFormat.E('ko_KR').format(day),
                                 style: TextStyle(
-                                  color: _isSameDay(day, _selectedDate) ? Colors.white : Colors.white54,
-                                  fontWeight: _isSameDay(day, _selectedDate) ? FontWeight.bold : FontWeight.normal,
+                                  color:
+                                      _isSameDay(day, _selectedDate)
+                                          ? Colors.white
+                                          : Colors.white54,
+                                  fontWeight:
+                                      _isSameDay(day, _selectedDate)
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                   fontSize: 14,
                                 ),
                               ),
@@ -255,15 +310,24 @@ class _ReportPageState extends State<ReportPage>
                               Text(
                                 "${day.day}",
                                 style: TextStyle(
-                                  color: _isSameDay(day, _selectedDate) ? Colors.white : Colors.white54,
-                                  fontWeight: _isSameDay(day, _selectedDate) ? FontWeight.bold : FontWeight.normal,
+                                  color:
+                                      _isSameDay(day, _selectedDate)
+                                          ? Colors.white
+                                          : Colors.white54,
+                                  fontWeight:
+                                      _isSameDay(day, _selectedDate)
+                                          ? FontWeight.bold
+                                          : FontWeight.normal,
                                   fontSize: 16,
                                 ),
                               ),
                               if (_isSameDay(day, _selectedDate))
                                 const Padding(
                                   padding: EdgeInsets.only(top: 2),
-                                  child: CircleAvatar(radius: 3, backgroundColor: Colors.white70),
+                                  child: CircleAvatar(
+                                    radius: 3,
+                                    backgroundColor: Colors.white70,
+                                  ),
                                 ),
                             ],
                           ),
@@ -272,19 +336,31 @@ class _ReportPageState extends State<ReportPage>
                   ],
                 ),
               ),
-              IconButton(icon: const Icon(Icons.chevron_right, color: Colors.white54), onPressed: _goToNextWeek),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: Colors.white54),
+                onPressed: _goToNextWeek,
+              ),
             ],
           ),
           const SizedBox(height: 30),
-          const Text("수면 성취", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text(
+            "수면 성취",
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 5),
-          const Text("목표 수면 대비 실제 수면 비율", style: TextStyle(color: Colors.white54)),
+          const Text(
+            "목표 수면 대비 실제 수면 비율",
+            style: TextStyle(color: Colors.white54),
+          ),
           const SizedBox(height: 30),
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
             percent: sleepPercent,
-            center: Text(percentText, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            center: Text(
+              percentText,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
             progressColor: const Color(0xFFAEC6CF),
             backgroundColor: Colors.white24,
             circularStrokeCap: CircularStrokeCap.round,
@@ -297,12 +373,32 @@ class _ReportPageState extends State<ReportPage>
             _infoRow("수면 만족도 평가", "보통"),
           ]),
           const SizedBox(height: 20),
-          _infoCard([const Text("일간 피드백", style: TextStyle(fontSize: 16))], height: 80),
+          _infoCard([
+            const Text("일간 피드백", style: TextStyle(fontSize: 16)),
+          ], height: 80),
+
+          const SizedBox(height: 30), // 버튼 위 여백
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFAEC6CF), // 테마 색상과 유사하게
+              foregroundColor: Colors.black, // 텍스트 색상
+              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: _saveSleepDataToFirebase, // 위에서 추가한 함수 연결
+            child: const Text("저장"),
+          ),
+          const SizedBox(height: 20), // 버튼 아래 여백
         ],
       ),
     );
   }
-
 
   // ---------------- Weekly Report ----------------
   Widget _buildWeeklyReport(Map<DateTime, double> weeklySleep) {
@@ -446,19 +542,30 @@ class _ReportPageState extends State<ReportPage>
     for (int i = 0; i < daysInMonth; i++) {
       DateTime day = DateTime(now.year, now.month, 1).add(Duration(days: i));
       final record = records.firstWhere(
-            (r) => r.date.year == day.year && r.date.month == day.month && r.date.day == day.day,
+        (r) =>
+            r.date.year == day.year &&
+            r.date.month == day.month &&
+            r.date.day == day.day,
         orElse: () => SleepRecord.empty(day),
       );
-      monthlySleep[DateTime(day.year, day.month, day.day)] = record.totalHours.toDouble();
+      monthlySleep[DateTime(day.year, day.month, day.day)] =
+          record.totalHours.toDouble();
     }
 
     // 월간 통계 계산
     final sleepValues = monthlySleep.values.where((v) => v > 0).toList();
-    double avgSleep = sleepValues.isNotEmpty
-        ? sleepValues.reduce((a, b) => a + b) / sleepValues.length
-        : 0.0;
-    double maxSleep = sleepValues.isNotEmpty ? sleepValues.reduce((a, b) => a > b ? a : b) : 0.0;
-    double minSleep = sleepValues.isNotEmpty ? sleepValues.reduce((a, b) => a < b ? a : b) : 0.0;
+    double avgSleep =
+        sleepValues.isNotEmpty
+            ? sleepValues.reduce((a, b) => a + b) / sleepValues.length
+            : 0.0;
+    double maxSleep =
+        sleepValues.isNotEmpty
+            ? sleepValues.reduce((a, b) => a > b ? a : b)
+            : 0.0;
+    double minSleep =
+        sleepValues.isNotEmpty
+            ? sleepValues.reduce((a, b) => a < b ? a : b)
+            : 0.0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -531,7 +638,9 @@ class _ReportPageState extends State<ReportPage>
           ]),
           const SizedBox(height: 10),
           // 월간 피드백 카드
-          _infoCard([const Text("월간 피드백", style: TextStyle(fontSize: 16))], height: 80),
+          _infoCard([
+            const Text("월간 피드백", style: TextStyle(fontSize: 16)),
+          ], height: 80),
         ],
       ),
     );
