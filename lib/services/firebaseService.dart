@@ -6,11 +6,16 @@ class FirebaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
   /// Firestore에서 사용자 문서 가져오기
-  Future<DocumentSnapshot<Map<String, dynamic>>> getUserDoc(String userId) async {
+  Future<DocumentSnapshot<Map<String, dynamic>>> getUserDoc(
+    String userId,
+  ) async {
     return await _db.collection('users').doc(userId).get();
   }
 
-  Future<void> saveTodaySleepData(String userId, Map<String, dynamic> sleepInfo) async {
+  Future<void> saveTodaySleepData(
+    String userId,
+    Map<String, dynamic> sleepInfo,
+  ) async {
     final today = DateTime.now();
     final dateId =
         "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
@@ -35,6 +40,10 @@ class FirebaseService {
           'deepSleep': sleepInfo['deepSleep'] ?? oldInfo['deepSleep'],
         },
         'satisfaction': sleepInfo['satisfaction'] ?? data['satisfaction'] ?? 0,
+        'replyYesterdayMessage':
+            sleepInfo['replyYesterdayMessage'] ??
+            data['replyYesterdayMessage'] ??
+            "",
         'feedback': sleepInfo['feedback'] ?? data['feedback'] ?? "",
         'updatedAt': Timestamp.now(),
       });
@@ -48,12 +57,17 @@ class FirebaseService {
         },
         'satisfaction': sleepInfo['satisfaction'] ?? 0,
         'feedback': sleepInfo['feedback'] ?? '',
+        'replyYesterdayMessage': sleepInfo['replyYesterdayMessage'] ?? "",
         'createdAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       });
     }
   }
-  Future<List<SleepRecord>> getWeeklySleep(String userId, {int days = 7}) async {
+
+  Future<List<SleepRecord>> getWeeklySleep(
+    String userId, {
+    int days = 7,
+  }) async {
     DateTime today = DateTime.now();
     DateTime start = today.subtract(Duration(days: days - 1));
 
@@ -64,12 +78,13 @@ class FirebaseService {
       String docId =
           "${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}";
 
-      DocumentSnapshot doc = await _db
-          .collection('sleep_records')
-          .doc(userId)
-          .collection('daily')
-          .doc(docId)
-          .get();
+      DocumentSnapshot doc =
+          await _db
+              .collection('sleep_records')
+              .doc(userId)
+              .collection('daily')
+              .doc(docId)
+              .get();
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
@@ -81,17 +96,19 @@ class FirebaseService {
           return 0.0;
         }
 
-        records.add(SleepRecord(
-          date: dateKey,
-          startTime: (info['startTime'] as Timestamp?)?.toDate(),
-          endTime: (info['endTime'] as Timestamp?)?.toDate(),
-          totalHours: toDouble(info['totalHours']),
-          deepSleep: toDouble(info['deepSleep']),
-          satisfaction: data['satisfaction'] ?? 0,
-          feedback: data['feedback'] ?? '',
-          createdAt: data['createdAt'] ?? Timestamp.now(),
-          updatedAt: data['updatedAt'] ?? Timestamp.now(),
-        ));
+        records.add(
+          SleepRecord(
+            date: dateKey,
+            startTime: (info['startTime'] as Timestamp?)?.toDate(),
+            endTime: (info['endTime'] as Timestamp?)?.toDate(),
+            totalHours: toDouble(info['totalHours']),
+            deepSleep: toDouble(info['deepSleep']),
+            satisfaction: data['satisfaction'] ?? 0,
+            feedback: data['feedback'] ?? '',
+            createdAt: data['createdAt'] ?? Timestamp.now(),
+            updatedAt: data['updatedAt'] ?? Timestamp.now(),
+          ),
+        );
       } else {
         records.add(SleepRecord.empty(dateKey));
       }
@@ -99,5 +116,4 @@ class FirebaseService {
 
     return records;
   }
-
 }
