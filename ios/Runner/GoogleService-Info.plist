@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBnz8EveIY8rgorVgjb2x-isz5q7WvKEmA</string>
+	<string>AIzaSyAYI7lmXkw5ezUmz8xD5vr5kfj3aQ6dOVA</string>
 	<key>GCM_SENDER_ID</key>
-	<string>203318599334</string>
+	<string>721965842654</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.example.healthCareApp</string>
 	<key>PROJECT_ID</key>
-	<string>digital-health-care-ca243</string>
+	<string>sleepmanager-1bac8</string>
 	<key>STORAGE_BUCKET</key>
-	<string>digital-health-care-ca243.firebasestorage.app</string>
+	<string>sleepmanager-1bac8.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:203318599334:ios:6cd7beab7b5b60a4135e67</string>
+	<string>1:721965842654:ios:2164a019b2666fd3f5c24f</string>
 </dict>
 </plist>

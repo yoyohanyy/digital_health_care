@@ -46,7 +46,6 @@ class HealthService {
             HealthDataType.SLEEP_REM,
           ]
           : [
-            HealthDataType.SLEEP_SESSION,
             HealthDataType.SLEEP_IN_BED,
             HealthDataType.SLEEP_ASLEEP,
             HealthDataType.SLEEP_AWAKE,
