@@ -140,7 +140,7 @@ class _ReportPageState extends State<ReportPage>
       final Map<String, dynamic> sleepData = {
         'startTime': _sleepStartTime,
         'endTime': _sleepEndTime,
-        'totalMinutes': _totalHours * 60,
+        'totalHours': _totalHours * 60,
         'deepSleep': _deepSleep, // 요청하신 대로 'deepSleep' 명칭 사용
       };
 
@@ -369,7 +369,7 @@ class _ReportPageState extends State<ReportPage>
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
             _infoRow("목표 수면 시간", _targetSleepTimeString),
-            _infoRow("실제 수면 시간", "${todayRecord.totalHours}시간"),
+            _infoRow("실제 수면 시간", _formatDuration(todayRecord.totalHours)),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
           const SizedBox(height: 20),
@@ -647,6 +647,20 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- UI Helpers ----------------
+
+  String _formatDuration(double totalHours) {
+    // 1. 시간(double)을 총 분(int)으로 변환합니다. (예: 5.466 * 60 = 328)
+    final int totalMinutes = (totalHours).round();
+
+    // 2. 총 분을 60으로 나눠 시간 부분을 계산합니다. (예: 328 ~/ 60 = 5)
+    final int hours = totalMinutes ~/ 60;
+
+    // 3. 총 분을 60으로 나눈 나머지를 분 부분으로 계산합니다. (예: 328 % 60 = 28)
+    final int minutes = totalMinutes % 60;
+
+    // 4. "5시간 28분" 형태로 문자열을 만듭니다.
+    return "${hours}시간 ${minutes}분";
+  }
 
   Widget _infoCard(List<Widget> children, {double? height}) {
     return Container(
