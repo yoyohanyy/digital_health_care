@@ -35,52 +35,41 @@ class _ReportPageState extends State<ReportPage>
   DateTime? _sleepStartTime;
   DateTime? _sleepEndTime;
   double _deepSleep = 0.0;
-  Map<DateTime, double> _weeklySleep = {};
   bool _isLoading = true;
   int _currentTabIndex = 0;
   String _targetSleepTimeString = "00:00 AM - 00:00 AM";
-
-  // 🆕 For dynamic date navigation
   DateTime _selectedDate = DateTime.now();
   late DateTime _currentWeekStart;
-  double _targetSleepDurationHours = 8.0; //목표 수면 시간을 저장할 곳
+  double _targetSleepDurationHours = 8.0;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
 
-    // ✅ 탭 컨트롤러에 리스너 추가
     _tabController.addListener(() {
-      // 탭이 변경될 때마다 상태를 업데이트하여 UI를 다시 그리도록 함
       setState(() {
         _currentTabIndex = _tabController.index;
       });
     });
 
-    // ✅ Initialize the current week (Sunday as start)
     _currentWeekStart = _getStartOfWeek(_selectedDate);
 
-    // ✅ Load sleep data
     _loadSleepDataForDate(_selectedDate);
 
-    // Firebase 데이터 불러오기
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _loadSleepRecords();
-      _loadTargetSleepTime();
+      await _loadSleepRecords();
+      await _loadTargetSleepTime();
     });
   }
 
-  // Helper to get start of the week (Sunday)
   DateTime _getStartOfWeek(DateTime date) {
-    // weekday: Monday=1, Sunday=7 → Sunday start = subtract weekday % 7
     return date.subtract(Duration(days: date.weekday % 7));
   }
 
   Future<void> _loadTargetSleepTime() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 저장된 값이 없으면 기본값 사용
     final wakeUpHour = prefs.getInt('wakeUpHour') ?? 8;
     final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? 0;
     final bedTimeHour = prefs.getInt('bedTimeHour') ?? 0;
@@ -89,24 +78,16 @@ class _ReportPageState extends State<ReportPage>
     final wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
     final bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
 
-    // ✅ 목표 수면 시간(분) 계산
-    int bedTimeInMinutes = bedTime.hour * 60 + bedTime.minute;
-    int wakeUpTimeInMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
-
-    int durationInMinutes;
-
-    // 취침 시간이 기상 시간보다 늦으면 (예: 23시 취침, 07시 기상)
-    if (bedTimeInMinutes > wakeUpTimeInMinutes) {
-      durationInMinutes = (24 * 60 - bedTimeInMinutes) + wakeUpTimeInMinutes;
-    } else {
-      durationInMinutes = wakeUpTimeInMinutes - bedTimeInMinutes;
-    }
+    int bedTimeMinutes = bedTime.hour * 60 + bedTime.minute;
+    int wakeUpMinutes = wakeUpTime.hour * 60 + wakeUpTime.minute;
+    int duration = bedTimeMinutes > wakeUpMinutes
+        ? (24 * 60 - bedTimeMinutes) + wakeUpMinutes
+        : wakeUpMinutes - bedTimeMinutes;
 
     setState(() {
       _targetSleepTimeString =
-          '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
-
-      _targetSleepDurationHours = durationInMinutes / 60.0;
+      '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
+      _targetSleepDurationHours = duration / 60.0;
     });
   }
 
@@ -129,7 +110,7 @@ class _ReportPageState extends State<ReportPage>
 
     if (_sleepStartTime != null && _sleepEndTime != null) {
       await _firebaseService.saveTodaySleepData(
-        "test_user_123", // 실제 로그인한 userId로 교체
+        "test_user_123",
         {
           'startTime': _sleepStartTime,
           'endTime': _sleepEndTime,
@@ -137,43 +118,6 @@ class _ReportPageState extends State<ReportPage>
           'deepSleep': _deepSleep,
         },
       );
-    }
-  }
-
-  Future<void> _loadWeeklySleep() async {
-    final records = await _firebaseService.getWeeklySleep("test_user_123");
-    debugPrint("📊 주간 수면 데이터: $records");
-
-    final Map<DateTime, double> weeklyMap = {};
-
-    for (var record in records) {
-      final dateKey = DateTime(
-        record.date.year,
-        record.date.month,
-        record.date.day,
-      );
-      weeklyMap[dateKey] = record.totalHours;
-    }
-
-    setState(() {
-      _weeklySleep = weeklyMap;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _saveSleepData() async {
-    if (_sleepStartTime != null && _sleepEndTime != null) {
-      await _firebaseService.saveTodaySleepData(
-        "test_user_123", // 실제 로그인한 userId로 교체
-        {
-          'startTime': _sleepStartTime,
-          'endTime': _sleepEndTime,
-          'totalMinutes': _totalHours * 60,
-          'deepSleep': _deepSleep,
-        },
-      );
-    } else {
-      debugPrint("⚠️ 수면 데이터가 준비되지 않았습니다.");
     }
   }
 
@@ -183,10 +127,7 @@ class _ReportPageState extends State<ReportPage>
       context,
       listen: false,
     );
-    await sleepProvider.fetchRecords(
-      userProvider.user!.id,
-      days: 30,
-    ); // 최근 30일 데이터 로드
+    await sleepProvider.fetchRecords(userProvider.user!.id, days: 30);
     setState(() {
       _isLoading = false;
     });
@@ -217,56 +158,31 @@ class _ReportPageState extends State<ReportPage>
     super.dispose();
   }
 
-  // ---------------- Main ----------------
+  bool _isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
   @override
   Widget build(BuildContext context) {
     final sleepProvider = Provider.of<SleepRecordProvider>(context);
     final records = sleepProvider.records;
-    // 🆕 오늘 record 찾기, 없으면 더미 데이터 생성
-    final today = _selectedDate;
-    SleepRecord todayRecord = records.firstWhere(
-      (r) =>
-          r.date.year == today.year &&
-          r.date.month == today.month &&
-          r.date.day == today.day,
-      orElse:
-          () => SleepRecord(
-            date: today,
-            startTime: today,
-            endTime: today,
-            totalHours: 0,
-            deepSleep: 0,
-            satisfaction: 0,
-            feedback: '데이터 없음',
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now(),
-          ),
+
+    // 오늘 record 가져오기
+    final todayRecord = records.firstWhere(
+          (r) => _isSameDay(r.date, _selectedDate),
+      orElse: () => SleepRecord.empty(_selectedDate),
     );
 
-    // 🆕 주간 데이터 Map
+    // 주간 Map 생성
     Map<DateTime, double> weeklySleep = {};
     for (int i = 0; i < 7; i++) {
       DateTime day = _currentWeekStart.add(Duration(days: i));
       final r = records.firstWhere(
-        (rec) =>
-            rec.date.year == day.year &&
-            rec.date.month == day.month &&
-            rec.date.day == day.day,
-        orElse:
-            () => SleepRecord(
-              date: day,
-              startTime: day,
-              endTime: day,
-              totalHours: 0,
-              deepSleep: 0,
-              satisfaction: 0,
-              feedback: '데이터 없음',
-              createdAt: Timestamp.now(),
-              updatedAt: Timestamp.now(),
-            ),
+            (rec) => _isSameDay(rec.date, day),
+        orElse: () => SleepRecord.empty(day),
       );
       weeklySleep[day] = r.totalHours.toDouble();
     }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A202C),
@@ -274,41 +190,13 @@ class _ReportPageState extends State<ReportPage>
           "리포트",
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-
         actions: [
-          // '일간' 탭(인덱스 0)일 때만 공유 아이콘을 표시합니다.
           if (_currentTabIndex == 0)
             IconButton(
               icon: const Icon(Icons.share, color: Colors.white),
-              onPressed: () {
-                final double lightSleepHours = (_totalHours - _deepSleep).clamp(
-                  0.0,
-                  _totalHours,
-                );
-
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => SharePage(
-                          totalSleepHours: _totalHours,
-                          deepSleepHours: _deepSleep,
-                          lightSleepHours: lightSleepHours,
-                          dayOfWeek: DateFormat(
-                            'EEEE',
-                            'ko_KR',
-                          ).format(_selectedDate),
-                          sleepScore: 78,
-                          avgHeartRate: 98,
-                          sleepSatisfaction: "보통",
-                          sleepGoalPercent: 76,
-                        ),
-                  ),
-                );
-              },
+              onPressed: null, // 필요시 SharePage 연결
             ),
         ],
-
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: "일간"), Tab(text: "주간"), Tab(text: "월간")],
@@ -318,7 +206,7 @@ class _ReportPageState extends State<ReportPage>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildDailyReport(todayRecord),
+          _buildDailyReport(todayRecord, weeklySleep),
           _buildWeeklyReport(weeklySleep),
           _buildMonthlyReport(),
         ],
@@ -327,22 +215,11 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Daily Report ----------------
-  Widget _buildDailyReport(SleepRecord todayRecord) {
-    List<DateTime> weekDays = List.generate(
-      7,
-      (i) => _currentWeekStart.add(Duration(days: i)),
-    );
+  Widget _buildDailyReport(SleepRecord todayRecord, Map<DateTime, double> weeklySleep) {
+    List<DateTime> weekDays = List.generate(7, (i) => _currentWeekStart.add(Duration(days: i)));
 
-    // ✅ 수면 목표 달성률 계산
-    // _targetSleepDurationHours가 0보다 클 때만 계산 (0으로 나누기 방지)
     final double sleepPercent =
-        (_targetSleepDurationHours > 0)
-            ? (_totalHours / _targetSleepDurationHours).clamp(
-              0.0,
-              1.0,
-            ) // 0.0과 1.0 사이 값으로 제한
-            : 0.0;
-
+    (_targetSleepDurationHours > 0) ? (_totalHours / _targetSleepDurationHours).clamp(0.0, 1.0) : 0.0;
     final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
 
     return SingleChildScrollView(
@@ -351,40 +228,26 @@ class _ReportPageState extends State<ReportPage>
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 20),
-
-          // 🗓 Dynamic Date Row
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              IconButton(
-                icon: const Icon(Icons.chevron_left, color: Colors.white54),
-                onPressed: _goToPreviousWeek,
-              ),
+              IconButton(icon: const Icon(Icons.chevron_left, color: Colors.white54), onPressed: _goToPreviousWeek),
               Expanded(
                 child: Row(
-                  // ✅ 7개의 날짜가 공간을 균등하게 나누도록 설정
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     for (var day in weekDays)
-                      // ✅ 각각의 날짜 아이템을 Expanded로 감싸서 균등하게 분배
                       Expanded(
                         child: GestureDetector(
                           onTap: () => _selectDate(day),
-                          // 투명한 영역도 터치가 되도록 설정
                           behavior: HitTestBehavior.opaque,
                           child: Column(
                             children: [
                               Text(
                                 DateFormat.E('ko_KR').format(day),
                                 style: TextStyle(
-                                  color:
-                                      _isSameDay(day, _selectedDate)
-                                          ? Colors.white
-                                          : Colors.white54,
-                                  fontWeight:
-                                      _isSameDay(day, _selectedDate)
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                  color: _isSameDay(day, _selectedDate) ? Colors.white : Colors.white54,
+                                  fontWeight: _isSameDay(day, _selectedDate) ? FontWeight.bold : FontWeight.normal,
                                   fontSize: 14,
                                 ),
                               ),
@@ -392,24 +255,15 @@ class _ReportPageState extends State<ReportPage>
                               Text(
                                 "${day.day}",
                                 style: TextStyle(
-                                  color:
-                                      _isSameDay(day, _selectedDate)
-                                          ? Colors.white
-                                          : Colors.white54,
-                                  fontWeight:
-                                      _isSameDay(day, _selectedDate)
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
+                                  color: _isSameDay(day, _selectedDate) ? Colors.white : Colors.white54,
+                                  fontWeight: _isSameDay(day, _selectedDate) ? FontWeight.bold : FontWeight.normal,
                                   fontSize: 16,
                                 ),
                               ),
                               if (_isSameDay(day, _selectedDate))
                                 const Padding(
                                   padding: EdgeInsets.only(top: 2),
-                                  child: CircleAvatar(
-                                    radius: 3,
-                                    backgroundColor: Colors.white70,
-                                  ),
+                                  child: CircleAvatar(radius: 3, backgroundColor: Colors.white70),
                                 ),
                             ],
                           ),
@@ -418,75 +272,37 @@ class _ReportPageState extends State<ReportPage>
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right, color: Colors.white54),
-                onPressed: _goToNextWeek,
-              ),
+              IconButton(icon: const Icon(Icons.chevron_right, color: Colors.white54), onPressed: _goToNextWeek),
             ],
           ),
-
           const SizedBox(height: 30),
-
-          const Text(
-            "수면 성취",
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
+          const Text("수면 성취", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 5),
-          const Text(
-            "목표 수면 대비 실제 수면 비율",
-            style: TextStyle(color: Colors.white54),
-          ),
+          const Text("목표 수면 대비 실제 수면 비율", style: TextStyle(color: Colors.white54)),
           const SizedBox(height: 30),
-
           CircularPercentIndicator(
             radius: 80.0,
             lineWidth: 15.0,
             percent: sleepPercent,
-            center: Text(
-              percentText,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            progressColor: Color(0xFFAEC6CF),
+            center: Text(percentText, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            progressColor: const Color(0xFFAEC6CF),
             backgroundColor: Colors.white24,
             circularStrokeCap: CircularStrokeCap.round,
           ),
-
           const SizedBox(height: 40),
-
           _infoCard([
             _infoRow("선택한 날짜", DateFormat('yyyy.MM.dd').format(_selectedDate)),
             _infoRow("목표 수면 시간", _targetSleepTimeString),
             _infoRow("실제 수면 시간", "${todayRecord.totalHours}시간"),
             _infoRow("수면 만족도 평가", "보통"),
           ]),
-
           const SizedBox(height: 20),
-
-          _infoCard([
-            const Text("일간 피드백", style: TextStyle(fontSize: 16)),
-          ], height: 80),
-
-          const SizedBox(height: 20),
-
-          _infoCard([
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text("이 날의 타임캡슐", style: TextStyle(fontSize: 16)),
-                Icon(Icons.chevron_right, color: Colors.white54),
-              ],
-            ),
-          ], height: 60),
-          const SizedBox(height: 20),
-
-          ElevatedButton(
-            onPressed: /*_saveSleepData,*/ null,
-            child: const Text("저장", style: TextStyle(fontSize: 16)),
-          ),
+          _infoCard([const Text("일간 피드백", style: TextStyle(fontSize: 16))], height: 80),
         ],
       ),
     );
   }
+
 
   // ---------------- Weekly Report ----------------
   Widget _buildWeeklyReport(Map<DateTime, double> weeklySleep) {
@@ -616,17 +432,52 @@ class _ReportPageState extends State<ReportPage>
   }
 
   // ---------------- Monthly Report ----------------
+  // ---------------- Monthly Report ----------------
   Widget _buildMonthlyReport() {
+    final sleepProvider = Provider.of<SleepRecordProvider>(context);
+    final records = sleepProvider.records;
+
+    final now = DateTime.now();
+    final firstDayOfMonth = DateTime(now.year, now.month, 1);
+    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+
+    // 월간 Map 생성 (시간 제거)
+    Map<DateTime, double> monthlySleep = {};
+    for (int i = 0; i < daysInMonth; i++) {
+      DateTime day = DateTime(now.year, now.month, 1).add(Duration(days: i));
+      final record = records.firstWhere(
+            (r) => r.date.year == day.year && r.date.month == day.month && r.date.day == day.day,
+        orElse: () => SleepRecord.empty(day),
+      );
+      monthlySleep[DateTime(day.year, day.month, day.day)] = record.totalHours.toDouble();
+    }
+
+    // 월간 통계 계산
+    final sleepValues = monthlySleep.values.where((v) => v > 0).toList();
+    double avgSleep = sleepValues.isNotEmpty
+        ? sleepValues.reduce((a, b) => a + b) / sleepValues.length
+        : 0.0;
+    double maxSleep = sleepValues.isNotEmpty ? sleepValues.reduce((a, b) => a > b ? a : b) : 0.0;
+    double minSleep = sleepValues.isNotEmpty ? sleepValues.reduce((a, b) => a < b ? a : b) : 0.0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
           TableCalendar(
-            focusedDay: DateTime.now(),
+            focusedDay: _selectedDate,
             firstDay: DateTime(2020),
             lastDay: DateTime(2030),
             calendarFormat: CalendarFormat.month,
             startingDayOfWeek: StartingDayOfWeek.sunday,
+            selectedDayPredicate: (day) => _isSameDay(day, _selectedDate),
+            onDaySelected: (selectedDay, focusedDay) {
+              setState(() {
+                _selectedDate = selectedDay;
+              });
+              _loadSleepDataForDate(selectedDay);
+              _tabController.animateTo(0); // 일간 탭으로 이동
+            },
             headerStyle: const HeaderStyle(
               formatButtonVisible: false,
               titleCentered: true,
@@ -638,35 +489,55 @@ class _ReportPageState extends State<ReportPage>
               weekdayStyle: TextStyle(color: Colors.white70),
               weekendStyle: TextStyle(color: Colors.white70),
             ),
-            calendarStyle: const CalendarStyle(
-              todayDecoration: BoxDecoration(
+            calendarStyle: CalendarStyle(
+              todayDecoration: const BoxDecoration(
                 color: Color(0xFFAEC6CF),
                 shape: BoxShape.circle,
               ),
-              defaultTextStyle: TextStyle(color: Colors.white),
-              weekendTextStyle: TextStyle(color: Colors.white70),
+              selectedDecoration: const BoxDecoration(
+                color: Colors.tealAccent,
+                shape: BoxShape.circle,
+              ),
+              defaultTextStyle: const TextStyle(color: Colors.white),
+              weekendTextStyle: const TextStyle(color: Colors.white70),
+            ),
+            calendarBuilders: CalendarBuilders(
+              markerBuilder: (context, day, events) {
+                DateTime key = DateTime(day.year, day.month, day.day);
+                double sleepHours = monthlySleep[key] ?? 0.0;
+                if (sleepHours > 0) {
+                  return Positioned(
+                    bottom: 1,
+                    child: Container(
+                      width: 20,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.tealAccent,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  );
+                }
+                return null;
+              },
             ),
           ),
           const SizedBox(height: 20),
+          // 월간 통계 카드
           _infoCard([
-            _infoRow("평균 수면 시간", "5h 30m"),
-            _infoRow("가장 긴 수면", "1:07 AM - 8:30 AM"),
-            _infoRow("가장 짧은 수면", "3:07 AM - 9:00 AM"),
-            _infoRow("평균 수면 만족도", "보통"),
+            _infoRow("평균 수면 시간", "${avgSleep.toStringAsFixed(1)}h"),
+            _infoRow("최장 수면 시간", "${maxSleep.toStringAsFixed(1)}h"),
+            _infoRow("최단 수면 시간", "${minSleep.toStringAsFixed(1)}h"),
           ]),
           const SizedBox(height: 10),
-          _infoCard([
-            const Text("월간 피드백", style: TextStyle(fontSize: 16)),
-          ], height: 80),
+          // 월간 피드백 카드
+          _infoCard([const Text("월간 피드백", style: TextStyle(fontSize: 16))], height: 80),
         ],
       ),
     );
   }
 
   // ---------------- UI Helpers ----------------
-  bool _isSameDay(DateTime a, DateTime b) {
-    return a.year == b.year && a.month == b.month && a.day == b.day;
-  }
 
   Widget _infoCard(List<Widget> children, {double? height}) {
     return Container(

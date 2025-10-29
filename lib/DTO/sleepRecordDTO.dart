@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SleepRecord {
   final DateTime date;
-  final DateTime startTime;
-  final DateTime endTime;
+  final DateTime? startTime;
+  final DateTime? endTime;
   final double totalHours;
-  final int deepSleep;
+  final double deepSleep;
   final int satisfaction;
   final String feedback;
   final Timestamp createdAt;
@@ -23,35 +23,15 @@ class SleepRecord {
     required this.updatedAt,
   });
 
-  factory SleepRecord.fromMap(Map<String, dynamic> map) {
-    return SleepRecord(
-      date: (map['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      startTime:
-          (map['sleepInfo']['startTime'] as Timestamp?)?.toDate() ??
-          DateTime.now(),
-      endTime:
-          (map['sleepInfo']['endTime'] as Timestamp?)?.toDate() ??
-          DateTime.now(),
-      totalHours: map['sleepInfo']?['totalHours'] ?? 0,
-      deepSleep: map['sleepInfo']?['deepSleep'] ?? 0,
-      satisfaction: map['satisfaction'] ?? 0,
-      feedback: map['feedback'] ?? '',
-      createdAt: map['createdAt'] as Timestamp? ?? Timestamp.now(),
-      updatedAt: map['updatedAt'] as Timestamp? ?? Timestamp.now(),
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'date': Timestamp.fromDate(date),
-      'startTime': Timestamp.fromDate(startTime),
-      'endTime': Timestamp.fromDate(endTime),
-      'totalHours': totalHours,
-      'deepSleep': deepSleep,
-      'satisfaction': satisfaction,
-      'feedback': feedback,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
-    };
-  }
+  factory SleepRecord.empty(DateTime date) => SleepRecord(
+    date: date,
+    startTime: null,
+    endTime: null,
+    totalHours: 0,
+    deepSleep: 0,
+    satisfaction: 0,
+    feedback: '',
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+  );
 }

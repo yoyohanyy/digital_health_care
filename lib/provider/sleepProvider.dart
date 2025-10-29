@@ -19,11 +19,11 @@ class SleepRecordProvider extends ChangeNotifier {
     DateTime today = DateTime.now();
     DateTime start = today.subtract(Duration(days: days - 1));
 
-    // daily collection에서 날짜 범위 문서 가져오기
     List<SleepRecord> loadedRecords = [];
     for (int i = 0; i < days; i++) {
       DateTime dateKey = DateTime(start.year, start.month, start.day + i);
-      String docId = "${dateKey.year}-${dateKey.month.toString().padLeft(2,'0')}-${dateKey.day.toString().padLeft(2,'0')}";
+      String docId =
+          "${dateKey.year}-${dateKey.month.toString().padLeft(2,'0')}-${dateKey.day.toString().padLeft(2,'0')}";
       DocumentSnapshot doc = await _firestore
           .collection('sleep_records')
           .doc(userId)
@@ -32,9 +32,20 @@ class SleepRecordProvider extends ChangeNotifier {
           .get();
 
       if (doc.exists && doc.data() != null) {
-        loadedRecords.add(SleepRecord.fromMap(doc.data() as Map<String, dynamic>));
+        final data = doc.data() as Map<String, dynamic>;
+        final sleepInfo = data['sleepInfo'] ?? {};
+        loadedRecords.add(SleepRecord(
+          date: dateKey,
+          startTime: (sleepInfo['startTime'] as Timestamp?)?.toDate() ?? dateKey,
+          endTime: (sleepInfo['endTime'] as Timestamp?)?.toDate() ?? dateKey,
+          totalHours: (sleepInfo['totalHours'] ?? 0).toDouble(),
+          deepSleep: (sleepInfo['deepSleep'] ?? 0).toDouble(),
+          satisfaction: (data['satisfaction'] ?? 0).toInt(),
+          feedback: data['feedback'] ?? '',
+          createdAt: data['createdAt'] ?? Timestamp.now(),
+          updatedAt: data['updatedAt'] ?? Timestamp.now(),
+        ));
       } else {
-        // 없는 날은 0으로 채움
         loadedRecords.add(SleepRecord(
           date: dateKey,
           startTime: dateKey,
@@ -49,9 +60,7 @@ class SleepRecordProvider extends ChangeNotifier {
       }
     }
 
-    // 최신 순 정렬
     loadedRecords.sort((a, b) => b.date.compareTo(a.date));
-
     _records = loadedRecords;
     _isLoading = false;
     notifyListeners();
@@ -59,17 +68,30 @@ class SleepRecordProvider extends ChangeNotifier {
 
   // 새로운 수면 기록 추가 또는 업데이트
   Future<void> saveRecord(String userId, SleepRecord record) async {
-    String docId = "${record.date.year}-${record.date.month.toString().padLeft(2,'0')}-${record.date.day.toString().padLeft(2,'0')}";
+    String docId =
+        "${record.date.year}-${record.date.month.toString().padLeft(2,'0')}-${record.date.day.toString().padLeft(2,'0')}";
 
     await _firestore
         .collection('sleep_records')
         .doc(userId)
         .collection('daily')
         .doc(docId)
-        .set(record.toMap(), SetOptions(merge: true));
+        .set({
+      'sleepInfo': {
+        'startTime': record.startTime,
+        'endTime': record.endTime,
+        'totalHours': record.totalHours,
+        'deepSleep': record.deepSleep,
+      },
+      'satisfaction': record.satisfaction,
+      'feedback': record.feedback,
+      'createdAt': record.createdAt,
+      'updatedAt': record.updatedAt,
+    }, SetOptions(merge: true));
 
     // provider 내부 목록 업데이트
-    int index = _records.indexWhere((r) => r.date.year == record.date.year &&
+    int index = _records.indexWhere((r) =>
+    r.date.year == record.date.year &&
         r.date.month == record.date.month &&
         r.date.day == record.date.day);
     if (index >= 0) {
@@ -80,6 +102,7 @@ class SleepRecordProvider extends ChangeNotifier {
 
     notifyListeners();
   }
+
   void setRecords(List<SleepRecord> newRecords) {
     _records = newRecords;
     _records.sort((a, b) => b.date.compareTo(a.date)); // 최신순 정렬
