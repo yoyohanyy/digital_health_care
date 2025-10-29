@@ -126,9 +126,9 @@ class _LetterPageState extends State<LetterPage> {
                     } else {
                       final String userId = userProvider.user!.id;
 
-                      // 3-2. 요청하신 'replyYesterdayMessage' 키로 데이터 맵 생성
+                      // 3-2. 요청하신 'sendMessage' 키로 데이터 맵 생성
                       final Map<String, dynamic> letterData = {
-                        'replyYesterdayMessage': currentText,
+                        'sendMessage': currentText,
                       };
 
                       // 3-3. ReportPage에서 사용한 '오늘의 데이터 저장' 함수 호출

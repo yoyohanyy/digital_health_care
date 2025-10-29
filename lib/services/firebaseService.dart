@@ -40,10 +40,7 @@ class FirebaseService {
           'deepSleep': sleepInfo['deepSleep'] ?? oldInfo['deepSleep'],
         },
         'satisfaction': sleepInfo['satisfaction'] ?? data['satisfaction'] ?? 0,
-        'replyYesterdayMessage':
-            sleepInfo['replyYesterdayMessage'] ??
-            data['replyYesterdayMessage'] ??
-            "",
+        'sendMessage': sleepInfo['sendMessage'] ?? data['sendMessage'] ?? "",
         'feedback': sleepInfo['feedback'] ?? data['feedback'] ?? "",
         'updatedAt': Timestamp.now(),
       });
@@ -57,7 +54,7 @@ class FirebaseService {
         },
         'satisfaction': sleepInfo['satisfaction'] ?? 0,
         'feedback': sleepInfo['feedback'] ?? '',
-        'replyYesterdayMessage': sleepInfo['replyYesterdayMessage'] ?? "",
+        'sendMessage': sleepInfo['sendMessage'] ?? "",
         'createdAt': Timestamp.now(),
         'updatedAt': Timestamp.now(),
       });
