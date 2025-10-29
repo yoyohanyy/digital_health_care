@@ -15,8 +15,9 @@ class FirebaseService {
   Future<void> saveTodaySleepData(
     String userId,
     Map<String, dynamic> sleepInfo,
+    DateTime dateToSave,
   ) async {
-    final today = DateTime.now();
+    final today = dateToSave;
     final dateId =
         "${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}";
 

@@ -146,7 +146,11 @@ class _ReportPageState extends State<ReportPage>
 
       try {
         // 4. Firebase 서비스 호출
-        await _firebaseService.saveTodaySleepData(userId, sleepData);
+        await _firebaseService.saveTodaySleepData(
+          userId,
+          sleepData,
+          _selectedDate,
+        );
         // 6. (중요) 저장 후 최신 데이터를 다시 불러옵니다.
         // 이렇게 하면 주간/월간 탭의 데이터도 즉시 새로고침됩니다.
         await _loadSleepRecords();

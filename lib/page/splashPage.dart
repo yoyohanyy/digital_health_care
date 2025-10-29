@@ -52,10 +52,8 @@ class _SplashPageState extends State<SplashPage> {
     final kakaoUser = await UserApi.instance.me();
     final userId = kakaoUser.id.toString();
 
-    final userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
-        .get();
+    final userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
 
     final data = userDoc.data() ?? {};
 
@@ -72,17 +70,24 @@ class _SplashPageState extends State<SplashPage> {
     );
 
     // 2️⃣ 오늘 수면 데이터 저장
-    Map<String, dynamic>? sleepInfo = await _healthService.fetchDailySleepData();
+    Map<String, dynamic>? sleepInfo =
+        await _healthService.fetchDailySleepData();
 
     if (sleepInfo != null && (sleepInfo['totalMinutes'] ?? 0) > 0) {
-      await _firebaseService.saveTodaySleepData(userId, sleepInfo);
+      await _firebaseService.saveTodaySleepData(
+        userId,
+        sleepInfo,
+        DateTime.now(),
+      );
     }
 
     // 3️⃣ 주간 수면 데이터
     final sleepRecords = await _firebaseService.getWeeklySleep(userId, days: 7);
 
-    Provider.of<SleepRecordProvider>(context, listen: false)
-        .setRecords(sleepRecords);
+    Provider.of<SleepRecordProvider>(
+      context,
+      listen: false,
+    ).setRecords(sleepRecords);
 
     if (!mounted) return;
     Navigator.pushReplacement(
@@ -95,19 +100,14 @@ class _SplashPageState extends State<SplashPage> {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Color(0xFF1A202C),
-      body: Center(
-        child: CircularProgressIndicator(
-          color: Color(0xFFAEC6CF),
-        ),
-      ),
+      body: Center(child: CircularProgressIndicator(color: Color(0xFFAEC6CF))),
     );
   }
+
   Future<void> testFirestore() async {
     try {
-      var test = await FirebaseFirestore.instance
-          .collection('test')
-          .doc('ping')
-          .get();
+      var test =
+          await FirebaseFirestore.instance.collection('test').doc('ping').get();
       print("✅ Firestore 연결 성공: ${test.data()}");
     } catch (e) {
       print("❌ Firestore 연결 실패: $e");

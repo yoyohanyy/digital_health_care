@@ -136,6 +136,7 @@ class _LetterPageState extends State<LetterPage> {
                       await _firebaseService.saveTodaySleepData(
                         userId,
                         letterData,
+                        DateTime.now(),
                       );
                     }
                   } catch (e) {
