@@ -2,8 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'letterPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import '../provider/userProvider.dart'; // ✅ UserProvider import
 
-// HomePage는 기존 코드에서 수정된 부분만 확인하시면 됩니다.
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -13,7 +14,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Timer _timer;
-  Duration _timeLeft = const Duration(hours: 9, minutes: 20, seconds: 11);
+  Duration _timeLeft = Duration.zero;
 
   // --- 상태 변수 추가 ---
   TimeOfDay _wakeUpTime = const TimeOfDay(hour: 8, minute: 0);
@@ -23,24 +24,40 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-
     _loadTimes();
 
+    // ✅ Timer that updates _timeLeft every second
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
       setState(() {
-        if (_timeLeft.inSeconds > 0) {
-          _timeLeft -= const Duration(seconds: 1);
-        }
+        _updateTimeLeft();
       });
     });
   }
 
-  // 👈 3. 저장된 시간을 불러오는 함수
+  // ✅ Helper: calculate remaining time until bedtime
+  void _updateTimeLeft() {
+    final now = DateTime.now();
+    final bedDateTime = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      _bedTime.hour,
+      _bedTime.minute,
+    );
+
+    // If bedtime already passed today, set to tomorrow
+    DateTime nextBedTime =
+        bedDateTime.isAfter(now)
+            ? bedDateTime
+            : bedDateTime.add(const Duration(days: 1));
+
+    _timeLeft = nextBedTime.difference(now);
+  }
+
   Future<void> _loadTimes() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      // SharedPreferences에서 hour와 minute 값을 각각 불러옵니다.
-      // 저장된 값이 없을 경우(??), 기존의 초기값을 사용합니다.
       final wakeUpHour = prefs.getInt('wakeUpHour') ?? _wakeUpTime.hour;
       final wakeUpMinute = prefs.getInt('wakeUpMinute') ?? _wakeUpTime.minute;
       _wakeUpTime = TimeOfDay(hour: wakeUpHour, minute: wakeUpMinute);
@@ -48,13 +65,13 @@ class _HomePageState extends State<HomePage> {
       final bedTimeHour = prefs.getInt('bedTimeHour') ?? _bedTime.hour;
       final bedTimeMinute = prefs.getInt('bedTimeMinute') ?? _bedTime.minute;
       _bedTime = TimeOfDay(hour: bedTimeHour, minute: bedTimeMinute);
+
+      _updateTimeLeft(); // ✅ initialize timeLeft when loading
     });
   }
 
-  // 👈 4. 현재 설정된 시간을 기기에 저장하는 함수
   Future<void> _saveTimes() async {
     final prefs = await SharedPreferences.getInstance();
-    // TimeOfDay 객체는 직접 저장이 안되므로, hour와 minute를 정수(int)로 분리해서 저장합니다.
     await prefs.setInt('wakeUpHour', _wakeUpTime.hour);
     await prefs.setInt('wakeUpMinute', _wakeUpTime.minute);
     await prefs.setInt('bedTimeHour', _bedTime.hour);
@@ -72,7 +89,6 @@ class _HomePageState extends State<HomePage> {
     return "${twoDigits(d.inHours)}:${twoDigits(d.inMinutes % 60)}:${twoDigits(d.inSeconds % 60)}";
   }
 
-  // 시간 포맷을 위한 함수 추가
   String _formatTimeOfDay(TimeOfDay tod) {
     final now = DateTime.now();
     final dt = DateTime(now.year, now.month, now.day, tod.hour, tod.minute);
@@ -81,16 +97,13 @@ class _HomePageState extends State<HomePage> {
     return "$period ${hour.toString().padLeft(2, ' ')}:${tod.minute.toString().padLeft(2, '0')}";
   }
 
-  // 시간 설정 시트 표시 함수
   void _showTimeSettingsSheet() {
-    // 기존 showModalBottomSheet 대신 showDialog를 사용합니다.
     showDialog(
       context: context,
       builder: (context) {
-        // Dialog 위젯으로 TimeSettingsSheet를 감싸줍니다.
         return Dialog(
-          backgroundColor: Colors.transparent, // 기본 배경을 투명하게
-          elevation: 0, // 그림자 제거
+          backgroundColor: Colors.transparent,
+          elevation: 0,
           child: TimeSettingsSheet(
             initialWakeUpTime: _wakeUpTime,
             initialBedTime: _bedTime,
@@ -98,8 +111,9 @@ class _HomePageState extends State<HomePage> {
               setState(() {
                 _wakeUpTime = newWakeUpTime;
                 _bedTime = newBedTime;
+                _updateTimeLeft(); // ✅ recalc timeLeft on save
               });
-              _saveTimes(); // 변경된 시간을 기기에 저장
+              _saveTimes();
             },
           ),
         );
@@ -109,28 +123,30 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    // Scaffold의 배경색을 어둡게 변경
+    final userProvider = Provider.of<UserProvider>(context);
+    final user = userProvider.user;
+
     return Scaffold(
       backgroundColor: const Color(0xFF1A202C),
       appBar: AppBar(
         title: const Text("홈"),
         backgroundColor: const Color(0xFF1A202C),
-        elevation: 0, // AppBar 그림자 제거
+        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
             const SizedBox(height: 20),
-            const Text(
-              "안녕하세요 동은님!",
-              style: TextStyle(fontSize: 20, color: Colors.white),
+            Text(
+              "안녕하세요 ${user?.nickname ?? "사용자"}님!",
+              style: const TextStyle(fontSize: 20, color: Colors.white),
             ),
             const SizedBox(height: 20),
 
             _infoCard([
-              const Text(
-                "오늘 동은님의 추천 취침 시간은",
+              Text(
+                "오늘 ${user?.nickname ?? "사용자"}님의 추천 취침 시간은",
                 style: TextStyle(fontSize: 16, color: Colors.white70),
               ),
               const SizedBox(height: 10),
@@ -156,10 +172,9 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 10),
               Text(
                 "설정 기상 시간 : ${_formatTimeOfDay(_wakeUpTime)}",
-                style: TextStyle(color: Colors.white70),
+                style: const TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 5),
-              // *** 수정된 부분 ***
               TextButton(
                 onPressed: _showTimeSettingsSheet,
                 child: const Text("수정하기"),
@@ -169,8 +184,8 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(height: 20),
 
             _infoCard([
-              const Text(
-                "동은님의 오늘 총 수면 시간은",
+              Text(
+                "${user?.nickname ?? "사용자"}님의 오늘 총 수면 시간은",
                 style: TextStyle(color: Colors.white70),
               ),
               const SizedBox(height: 10),
@@ -193,13 +208,11 @@ class _HomePageState extends State<HomePage> {
 
             InkWell(
               onTap: () {
-                // LetterPage로 화면을 전환합니다.
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const LetterPage()),
                 );
               },
-              // 터치 시 배경이 어두워지는 효과를 없애기 위함
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
               child: _infoCard([
@@ -226,7 +239,7 @@ class _HomePageState extends State<HomePage> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D3748), // 카드 배경색 변경
+        color: const Color(0xFF2D3748),
         border: Border.all(color: Colors.white24),
         borderRadius: BorderRadius.circular(10),
       ),
@@ -235,7 +248,7 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-// +++ 여기서부터 새로 추가된 위젯입니다 +++
+// +++ TimeSettingsSheet 그대로 유지 +++
 class TimeSettingsSheet extends StatefulWidget {
   final TimeOfDay initialWakeUpTime;
   final TimeOfDay initialBedTime;
@@ -264,10 +277,8 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
     _bedTime = widget.initialBedTime;
   }
 
-  // TimeOfDay를 '오전/오후 hh:mm' 형식의 문자열로 변환하는 함수
   String _formatTime(TimeOfDay time) {
     final period = time.period == DayPeriod.am ? '오전' : '오후';
-    // 12시간 형식으로 변환 (0시는 12시로 표시)
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
     return '$period ${hour.toString().padLeft(2, ' ')}:$minute';
@@ -278,12 +289,11 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
     return '${hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
   }
 
-  // TimePicker를 보여주고 선택된 시간을 상태에 반영하는 함수
   Future<void> _selectTime(BuildContext context, bool isWakeUp) async {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: isWakeUp ? _wakeUpTime : _bedTime,
-      initialEntryMode: TimePickerEntryMode.input, // 숫자 입력 모드로 시작
+      initialEntryMode: TimePickerEntryMode.input,
     );
     if (picked != null) {
       setState(() {
@@ -296,10 +306,8 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
     }
   }
 
-  // 추천 시간을 계산하는 함수
   List<TimeOfDay> _getRecommendedTimes() {
     final now = DateTime.now();
-    // TimeOfDay를 DateTime으로 변환하여 계산
     final wakeUpDateTime = DateTime(
       now.year,
       now.month,
@@ -307,20 +315,15 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
       _wakeUpTime.hour,
       _wakeUpTime.minute,
     );
-
-    // 기상 시간으로부터 7시간 30분
     final recommendedTime1 = wakeUpDateTime.subtract(
       const Duration(hours: 7, minutes: 30),
     );
-
     return [TimeOfDay.fromDateTime(recommendedTime1)];
   }
 
   @override
   Widget build(BuildContext context) {
     final recommendedTimes = _getRecommendedTimes();
-
-    // SafeArea를 사용하여 시스템 UI를 피함
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 3.0),
@@ -363,7 +366,7 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
                         },
                       ),
                     );
-                  }).toList(),
+                  }),
                 ],
               ),
               const SizedBox(height: 16),
@@ -389,12 +392,12 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
               ElevatedButton(
                 onPressed: () {
                   widget.onSave(_wakeUpTime, _bedTime);
-                  Navigator.pop(context); // 시트 닫기
+                  Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2D3748),
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 0, // 그림자 제거
+                  elevation: 0,
                 ),
                 child: const Text(
                   "저장하기",
@@ -408,7 +411,6 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
     );
   }
 
-  // 시간 선택 UI를 만드는 헬퍼 위젯
   Widget _buildTimeSelector(String label, TimeOfDay time, VoidCallback onTap) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -433,12 +435,12 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
                 const Icon(Icons.access_time, color: Colors.white54),
                 const SizedBox(width: 16),
                 Text(
-                  _formatTime(time).split(' ')[0], // 오전/오후
+                  _formatTime(time).split(' ')[0],
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  _formatTimeValue(time), // hh:mm
+                  _formatTimeValue(time),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 28,

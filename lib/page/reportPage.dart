@@ -85,6 +85,7 @@ class _ReportPageState extends State<ReportPage>
             ? (24 * 60 - bedTimeMinutes) + wakeUpMinutes
             : wakeUpMinutes - bedTimeMinutes;
 
+    if (!mounted) return;
     setState(() {
       _targetSleepTimeString =
           '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
@@ -170,6 +171,7 @@ class _ReportPageState extends State<ReportPage>
       listen: false,
     );
     await sleepProvider.fetchRecords(userProvider.user!.id, days: 30);
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
@@ -663,7 +665,7 @@ class _ReportPageState extends State<ReportPage>
     final int minutes = totalMinutes % 60;
 
     // 4. "5시간 28분" 형태로 문자열을 만듭니다.
-    return "${hours}시간 ${minutes}분";
+    return "$hours시간 $minutes분";
   }
 
   Widget _infoCard(List<Widget> children, {double? height}) {
