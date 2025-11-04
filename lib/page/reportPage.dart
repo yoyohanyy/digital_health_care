@@ -85,6 +85,7 @@ class _ReportPageState extends State<ReportPage>
             ? (24 * 60 - bedTimeMinutes) + wakeUpMinutes
             : wakeUpMinutes - bedTimeMinutes;
 
+    if (!mounted) return;
     setState(() {
       _targetSleepTimeString =
           '${_formatTimeOfDay(bedTime)} - ${_formatTimeOfDay(wakeUpTime)}';
@@ -170,6 +171,7 @@ class _ReportPageState extends State<ReportPage>
       listen: false,
     );
     await sleepProvider.fetchRecords(userProvider.user!.id, days: 30);
+    if (!mounted) return;
     setState(() {
       _isLoading = false;
     });
@@ -222,7 +224,7 @@ class _ReportPageState extends State<ReportPage>
         (rec) => _isSameDay(rec.date, day),
         orElse: () => SleepRecord.empty(day),
       );
-      weeklySleep[day] = r.totalHours.toDouble();
+      weeklySleep[day] = r.totalHours.toDouble() / 60;
     }
 
     return Scaffold(
@@ -272,6 +274,24 @@ class _ReportPageState extends State<ReportPage>
             : 0.0;
     final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
 
+    final int percentScore = (sleepPercent * 100).toInt();
+    Color sleepColor;
+
+    // 1. 과수면(9시간 초과)을 가장 먼저 체크합니다.
+    // _totalHours는 HealthService에서 가져온 시간(double) 값입니다.
+    if (_totalHours > 9.0) {
+      sleepColor = Colors.yellow[700]!; // 과수면 (경고)
+    }
+    // 2. 퍼센트 기준으로 나머지 상태를 체크합니다.
+    else if (percentScore >= 76) {
+      sleepColor = Colors.blue[400]!; // 76-100: 매우 좋음
+    } else if (percentScore >= 51) {
+      sleepColor = Colors.green; // 51-75: 좋음
+    } else if (percentScore >= 26) {
+      sleepColor = Colors.orange[600]!; // 26-50: 나쁨
+    } else {
+      sleepColor = Colors.red[600]!; // 0-25: 매우 나쁨
+    }
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -365,7 +385,7 @@ class _ReportPageState extends State<ReportPage>
               percentText,
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
-            progressColor: const Color(0xFFAEC6CF),
+            progressColor: sleepColor,
             backgroundColor: Colors.white24,
             circularStrokeCap: CircularStrokeCap.round,
           ),
@@ -407,6 +427,24 @@ class _ReportPageState extends State<ReportPage>
   // ---------------- Weekly Report ----------------
   Widget _buildWeeklyReport(Map<DateTime, double> weeklySleep) {
     DateTime weekStart = _currentWeekStart;
+
+    final validSleepValues = weeklySleep.values.where((v) => v > 0).toList();
+
+    double avgSleepHours = 0.0;
+    double maxSleepHours = 0.0;
+    double minSleepHours = 0.0;
+
+    if (validSleepValues.isNotEmpty) {
+      avgSleepHours =
+          validSleepValues.reduce((a, b) => a + b) / validSleepValues.length;
+      maxSleepHours = validSleepValues.reduce((a, b) => a > b ? a : b);
+      minSleepHours = validSleepValues.reduce((a, b) => a < b ? a : b);
+    }
+
+    final String avgSleepString = _formatDuration(avgSleepHours * 60.0);
+    final String maxSleepString = _formatDuration(maxSleepHours * 60.0);
+    final String minSleepString = _formatDuration(minSleepHours * 60.0);
+
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -496,16 +534,35 @@ class _ReportPageState extends State<ReportPage>
                         barGroups: List.generate(7, (i) {
                           DateTime date = weekStart.add(Duration(days: i));
                           double sleepHours = weeklySleep[date] ?? 0.0;
-                          return _barData(i, sleepHours);
+                          Color barColor;
+                          double sleepPercent =
+                              (_targetSleepDurationHours > 0)
+                                  ? (sleepHours / _targetSleepDurationHours)
+                                      .clamp(0.0, 1.0)
+                                  : 0.0;
+                          final int percentScore = (sleepPercent * 100).toInt();
+                          if (sleepHours > 9.0) {
+                            barColor = Colors.yellow[700]!; // 과수면
+                          } else if (percentScore >= 76) {
+                            barColor = Colors.blue[400]!; // 매우 좋음
+                          } else if (percentScore >= 51) {
+                            barColor = Colors.green; // 좋음
+                          } else if (percentScore >= 26) {
+                            barColor = Colors.orange[600]!; // 나쁨
+                          } else {
+                            barColor = Colors.red[600]!; // 매우 나쁨
+                          }
+
+                          return _barData(i, sleepHours, barColor: barColor);
                         }),
                       ),
                     ),
           ),
           const SizedBox(height: 20),
           _infoCard([
-            _infoRow("평균 수면 시간", "5h 30m"),
-            _infoRow("가장 긴 수면", "1:07 AM - 8:30 AM"),
-            _infoRow("가장 짧은 수면", "3:07 AM - 9:00 AM"),
+            _infoRow("평균 수면 시간", avgSleepString),
+            _infoRow("가장 긴 수면", maxSleepString),
+            _infoRow("가장 짧은 수면", minSleepString),
             _infoRow("평균 수면 만족도", "보통"),
           ]),
           const SizedBox(height: 10),
@@ -517,13 +574,13 @@ class _ReportPageState extends State<ReportPage>
     );
   }
 
-  BarChartGroupData _barData(int x, double y, {bool highlighted = false}) {
+  BarChartGroupData _barData(int x, double y, {required Color barColor}) {
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
           toY: y,
-          color: highlighted ? const Color(0xFFAEC6CF) : Colors.grey[600],
+          color: barColor,
           width: 18,
           borderRadius: BorderRadius.circular(6),
         ),
@@ -537,14 +594,23 @@ class _ReportPageState extends State<ReportPage>
     final sleepProvider = Provider.of<SleepRecordProvider>(context);
     final records = sleepProvider.records;
 
-    final now = DateTime.now();
-    final firstDayOfMonth = DateTime(now.year, now.month, 1);
-    final daysInMonth = DateTime(now.year, now.month + 1, 0).day;
+    //final now = DateTime.now();
+    final firstDayOfMonth = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      1,
+    );
+    final daysInMonth =
+        DateTime(_selectedDate.year, _selectedDate.month + 1, 0).day;
 
     // 월간 Map 생성 (시간 제거)
     Map<DateTime, double> monthlySleep = {};
     for (int i = 0; i < daysInMonth; i++) {
-      DateTime day = DateTime(now.year, now.month, 1).add(Duration(days: i));
+      DateTime day = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        1,
+      ).add(Duration(days: i));
       final record = records.firstWhere(
         (r) =>
             r.date.year == day.year &&
@@ -553,7 +619,7 @@ class _ReportPageState extends State<ReportPage>
         orElse: () => SleepRecord.empty(day),
       );
       monthlySleep[DateTime(day.year, day.month, day.day)] =
-          record.totalHours.toDouble();
+          record.totalHours.toDouble() / 60;
     }
 
     // 월간 통계 계산
@@ -570,6 +636,10 @@ class _ReportPageState extends State<ReportPage>
         sleepValues.isNotEmpty
             ? sleepValues.reduce((a, b) => a < b ? a : b)
             : 0.0;
+
+    final String avgSleepString = _formatDuration(avgSleep * 60.0);
+    final String maxSleepString = _formatDuration(maxSleep * 60.0);
+    final String minSleepString = _formatDuration(minSleep * 60.0);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -617,13 +687,37 @@ class _ReportPageState extends State<ReportPage>
                 DateTime key = DateTime(day.year, day.month, day.day);
                 double sleepHours = monthlySleep[key] ?? 0.0;
                 if (sleepHours > 0) {
+                  Color sleepColor;
+                  double sleepPercent =
+                      (_targetSleepDurationHours > 0)
+                          ? (sleepHours / _targetSleepDurationHours).clamp(
+                            0.0,
+                            1.0,
+                          )
+                          : 0.0;
+                  final int percentScore = (sleepPercent * 100).toInt();
+
+                  // 1. 과수면(9시간 초과) 체크
+                  if (sleepHours > 9.0) {
+                    sleepColor = Colors.yellow[700]!; // 과수면
+                  }
+                  // 2. 퍼센트 기준 체크
+                  else if (percentScore >= 76) {
+                    sleepColor = Colors.blue[400]!; // 매우 좋음
+                  } else if (percentScore >= 51) {
+                    sleepColor = Colors.green; // 좋음
+                  } else if (percentScore >= 26) {
+                    sleepColor = Colors.orange[600]!; // 나쁨
+                  } else {
+                    sleepColor = Colors.red[600]!; // 매우 나쁨
+                  }
                   return Positioned(
                     bottom: 1,
                     child: Container(
                       width: 20,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.tealAccent,
+                        color: sleepColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -636,9 +730,9 @@ class _ReportPageState extends State<ReportPage>
           const SizedBox(height: 20),
           // 월간 통계 카드
           _infoCard([
-            _infoRow("평균 수면 시간", "${avgSleep.toStringAsFixed(1)}h"),
-            _infoRow("최장 수면 시간", "${maxSleep.toStringAsFixed(1)}h"),
-            _infoRow("최단 수면 시간", "${minSleep.toStringAsFixed(1)}h"),
+            _infoRow("평균 수면 시간", avgSleepString),
+            _infoRow("최장 수면 시간", maxSleepString),
+            _infoRow("최단 수면 시간", minSleepString),
           ]),
           const SizedBox(height: 10),
           // 월간 피드백 카드
@@ -663,7 +757,7 @@ class _ReportPageState extends State<ReportPage>
     final int minutes = totalMinutes % 60;
 
     // 4. "5시간 28분" 형태로 문자열을 만듭니다.
-    return "${hours}시간 ${minutes}분";
+    return "$hours시간 $minutes분";
   }
 
   Widget _infoCard(List<Widget> children, {double? height}) {
