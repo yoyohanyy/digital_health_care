@@ -566,9 +566,9 @@ class _ReportPageState extends State<ReportPage>
             _infoRow("평균 수면 만족도", "보통"),
           ]),
           const SizedBox(height: 10),
-          _infoCard([
+          /*_infoCard([
             const Text("주간 피드백", style: TextStyle(fontSize: 16)),
-          ], height: 80),
+          ], height: 80),*/
         ],
       ),
     );
@@ -736,9 +736,9 @@ class _ReportPageState extends State<ReportPage>
           ]),
           const SizedBox(height: 10),
           // 월간 피드백 카드
-          _infoCard([
+          /*_infoCard([
             const Text("월간 피드백", style: TextStyle(fontSize: 16)),
-          ], height: 80),
+          ], height: 80),*/
         ],
       ),
     );
