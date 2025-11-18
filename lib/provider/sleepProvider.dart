@@ -23,40 +23,46 @@ class SleepRecordProvider extends ChangeNotifier {
     for (int i = 0; i < days; i++) {
       DateTime dateKey = DateTime(start.year, start.month, start.day + i);
       String docId =
-          "${dateKey.year}-${dateKey.month.toString().padLeft(2,'0')}-${dateKey.day.toString().padLeft(2,'0')}";
-      DocumentSnapshot doc = await _firestore
-          .collection('sleep_records')
-          .doc(userId)
-          .collection('daily')
-          .doc(docId)
-          .get();
+          "${dateKey.year}-${dateKey.month.toString().padLeft(2, '0')}-${dateKey.day.toString().padLeft(2, '0')}";
+      DocumentSnapshot doc =
+          await _firestore
+              .collection('sleep_records')
+              .doc(userId)
+              .collection('daily')
+              .doc(docId)
+              .get();
 
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         final sleepInfo = data['sleepInfo'] ?? {};
-        loadedRecords.add(SleepRecord(
-          date: dateKey,
-          startTime: (sleepInfo['startTime'] as Timestamp?)?.toDate() ?? dateKey,
-          endTime: (sleepInfo['endTime'] as Timestamp?)?.toDate() ?? dateKey,
-          totalHours: (sleepInfo['totalHours'] ?? 0).toDouble(),
-          deepSleep: (sleepInfo['deepSleep'] ?? 0).toDouble(),
-          satisfaction: (data['satisfaction'] ?? 0).toInt(),
-          feedback: data['feedback'] ?? '',
-          createdAt: data['createdAt'] ?? Timestamp.now(),
-          updatedAt: data['updatedAt'] ?? Timestamp.now(),
-        ));
+        loadedRecords.add(
+          SleepRecord(
+            date: dateKey,
+            startTime:
+                (sleepInfo['startTime'] as Timestamp?)?.toDate() ?? dateKey,
+            endTime: (sleepInfo['endTime'] as Timestamp?)?.toDate() ?? dateKey,
+            totalHours: (sleepInfo['totalHours'] ?? 0).toDouble(),
+            deepSleep: (sleepInfo['deepSleep'] ?? 0).toDouble(),
+            satisfaction: (data['satisfaction'] ?? 0).toInt(),
+            feedback: data['feedback'] ?? '',
+            createdAt: data['createdAt'] ?? Timestamp.now(),
+            updatedAt: data['updatedAt'] ?? Timestamp.now(),
+          ),
+        );
       } else {
-        loadedRecords.add(SleepRecord(
-          date: dateKey,
-          startTime: dateKey,
-          endTime: dateKey,
-          totalHours: 0,
-          deepSleep: 0,
-          satisfaction: 0,
-          feedback: '',
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        ));
+        loadedRecords.add(
+          SleepRecord(
+            date: dateKey,
+            startTime: dateKey,
+            endTime: dateKey,
+            totalHours: 0,
+            deepSleep: 0,
+            satisfaction: 0,
+            feedback: '',
+            createdAt: Timestamp.now(),
+            updatedAt: Timestamp.now(),
+          ),
+        );
       }
     }
 
@@ -69,7 +75,7 @@ class SleepRecordProvider extends ChangeNotifier {
   // 새로운 수면 기록 추가 또는 업데이트
   Future<void> saveRecord(String userId, SleepRecord record) async {
     String docId =
-        "${record.date.year}-${record.date.month.toString().padLeft(2,'0')}-${record.date.day.toString().padLeft(2,'0')}";
+        "${record.date.year}-${record.date.month.toString().padLeft(2, '0')}-${record.date.day.toString().padLeft(2, '0')}";
 
     await _firestore
         .collection('sleep_records')
@@ -77,23 +83,25 @@ class SleepRecordProvider extends ChangeNotifier {
         .collection('daily')
         .doc(docId)
         .set({
-      'sleepInfo': {
-        'startTime': record.startTime,
-        'endTime': record.endTime,
-        'totalHours': record.totalHours,
-        'deepSleep': record.deepSleep,
-      },
-      'satisfaction': record.satisfaction,
-      'feedback': record.feedback,
-      'createdAt': record.createdAt,
-      'updatedAt': record.updatedAt,
-    }, SetOptions(merge: true));
+          'sleepInfo': {
+            'startTime': record.startTime,
+            'endTime': record.endTime,
+            'totalHours': record.totalHours,
+            'deepSleep': record.deepSleep,
+          },
+          'satisfaction': record.satisfaction,
+          'feedback': record.feedback,
+          'createdAt': record.createdAt,
+          'updatedAt': record.updatedAt,
+        }, SetOptions(merge: true));
 
     // provider 내부 목록 업데이트
-    int index = _records.indexWhere((r) =>
-    r.date.year == record.date.year &&
-        r.date.month == record.date.month &&
-        r.date.day == record.date.day);
+    int index = _records.indexWhere(
+      (r) =>
+          r.date.year == record.date.year &&
+          r.date.month == record.date.month &&
+          r.date.day == record.date.day,
+    );
     if (index >= 0) {
       _records[index] = record;
     } else {

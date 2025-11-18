@@ -268,19 +268,31 @@ class _ReportPageState extends State<ReportPage>
       (i) => _currentWeekStart.add(Duration(days: i)),
     );
 
+    final double totalHoursFromDB =
+        todayRecord.totalHours /
+        60.0; // 2. HealthService의 _totalHours 대신 totalHoursFromDB를 사용하여 퍼센트 계산
     final double sleepPercent =
+        (_targetSleepDurationHours > 0)
+            ? (totalHoursFromDB / _targetSleepDurationHours).clamp(0.0, 1.0)
+            : 0.0;
+
+    /*    final double sleepPercent =
         (_targetSleepDurationHours > 0)
             ? (_totalHours / _targetSleepDurationHours).clamp(0.0, 1.0)
             : 0.0;
+*/
     final String percentText = "${(sleepPercent * 100).toStringAsFixed(0)}%";
 
     final int percentScore = (sleepPercent * 100).toInt();
     Color sleepColor;
 
+    Color centerTextColor = Colors.white;
+
     // 1. 과수면(9시간 초과)을 가장 먼저 체크합니다.
     // _totalHours는 HealthService에서 가져온 시간(double) 값입니다.
-    if (_totalHours > 9.0) {
+    if (totalHoursFromDB > 9.0) {
       sleepColor = Colors.yellow[700]!; // 과수면 (경고)
+      centerTextColor = Colors.red[600]!;
     }
     // 2. 퍼센트 기준으로 나머지 상태를 체크합니다.
     else if (percentScore >= 76) {
@@ -383,7 +395,11 @@ class _ReportPageState extends State<ReportPage>
             percent: sleepPercent,
             center: Text(
               percentText,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: centerTextColor,
+              ),
             ),
             progressColor: sleepColor,
             backgroundColor: Colors.white24,
@@ -658,6 +674,16 @@ class _ReportPageState extends State<ReportPage>
               });
               _loadSleepDataForDate(selectedDay);
               _tabController.animateTo(0); // 일간 탭으로 이동
+            },
+            onPageChanged: (focusedDay) {
+              // 헤더의 화살표나 스와이프를 통해 월이 변경될 때 호출됩니다.
+              // focusedDay는 새로 표시되는 월의 임의의 날짜입니다.
+              setState(() {
+                // _selectedDate를 새 월의 날짜로 업데이트합니다.
+                // 이렇게 하면 build가 다시 실행되고
+                // _buildMonthlyReport가 이 날짜의 월을 기준으로 통계를 다시 계산합니다.
+                _selectedDate = focusedDay;
+              });
             },
             headerStyle: const HeaderStyle(
               formatButtonVisible: false,

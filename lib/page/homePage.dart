@@ -294,7 +294,35 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
       context: context,
       initialTime: isWakeUp ? _wakeUpTime : _bedTime,
       initialEntryMode: TimePickerEntryMode.input,
+      builder: (BuildContext context, Widget? child) {
+        // Theme 위젯으로 감싸서 색상을 덮어씁니다.
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            // ----------------------------------------------------
+            // 여기에 원하는 색상을 지정하세요
+            // ----------------------------------------------------
+            colorScheme: const ColorScheme.dark(
+              // ✅ 주요 색상 (선택된 숫자 배경, 시계 상단 헤더)
+              primary: Color(0xFF4A5568),
+              // ✅ primary 색상 위의 텍스트 (예: 헤더의 시간)
+              onPrimary: Colors.white,
+              // ✅ 다이얼로그 전체 배경색
+              surface: Color(0xFF2D3748),
+              // ✅ 배경색 위의 텍스트 (예: 시계 다이얼 숫자)
+              onSurface: Colors.white,
+            ),
+            // ✅ "확인", "취소" 버튼 텍스트 색상
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.tealAccent, // 앱의 강조색과 맞추면 좋습니다.
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
+
     if (picked != null) {
       setState(() {
         if (isWakeUp) {
@@ -333,78 +361,88 @@ class _TimeSettingsSheetState extends State<TimeSettingsSheet> {
             color: const Color(0xFF2D3748),
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildTimeSelector(
-                "기상 시간 설정",
-                _wakeUpTime,
-                () => _selectTime(context, true),
-              ),
-              const SizedBox(height: 16),
-              _buildTimeSelector(
-                "취침 시간 설정",
-                _bedTime,
-                () => _selectTime(context, false),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Text("추천 시간:", style: TextStyle(color: Colors.white70)),
-                  const SizedBox(width: 8),
-                  ...recommendedTimes.map((time) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                      child: ActionChip(
-                        label: Text(_formatTime(time)),
-                        backgroundColor: const Color(0xFF2D3748),
-                        labelStyle: const TextStyle(color: Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            _bedTime = time;
-                          });
-                        },
-                      ),
-                    );
-                  }),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Checkbox(
-                    value: _isNotificationEnabled,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _isNotificationEnabled = value ?? false;
-                      });
-                    },
-                    activeColor: Colors.tealAccent,
-                    checkColor: Colors.black,
-                  ),
-                  const Text(
-                    "설정 취침 시간에 알림 받기",
-                    style: TextStyle(color: Colors.white, fontSize: 10),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: () {
-                  widget.onSave(_wakeUpTime, _bedTime);
-                  Navigator.pop(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF2D3748),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 0,
+
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTimeSelector(
+                  "기상 시간 설정",
+                  _wakeUpTime,
+                  () => _selectTime(context, true),
                 ),
-                child: const Text(
-                  "저장하기",
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                const SizedBox(height: 16),
+                _buildTimeSelector(
+                  "취침 시간 설정",
+                  _bedTime,
+                  () => _selectTime(context, false),
                 ),
-              ),
-            ],
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 8.0, // 가로 아이템 사이 간격
+                  runSpacing: 4.0, // 세로 줄 사이 간격
+                  crossAxisAlignment: WrapCrossAlignment.center, // 세로 정렬
+
+                  children: [
+                    const Text(
+                      "추천 시간:",
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                    // const SizedBox(width: 8), // Wrap의 spacing이 대신함
+                    ...recommendedTimes.map((time) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: ActionChip(
+                          label: Text(_formatTime(time)),
+                          backgroundColor: const Color(0xFF2D3748),
+                          labelStyle: const TextStyle(color: Colors.white),
+                          onPressed: () {
+                            setState(() {
+                              _bedTime = time;
+                            });
+                          },
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Checkbox(
+                      value: _isNotificationEnabled,
+                      onChanged: (bool? value) {
+                        setState(() {
+                          _isNotificationEnabled = value ?? false;
+                        });
+                      },
+                      activeColor: Colors.tealAccent,
+                      checkColor: Colors.black,
+                    ),
+                    const Text(
+                      "설정 취침 시간에 알림 받기",
+                      style: TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    widget.onSave(_wakeUpTime, _bedTime);
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2D3748),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "저장하기",
+                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
