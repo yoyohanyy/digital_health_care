@@ -4,6 +4,8 @@ import 'letterPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import '../provider/userProvider.dart'; // ✅ UserProvider import
+import '../provider/sleepProvider.dart';
+import '../DTO/sleepRecordDTO.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,6 +27,16 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadTimes();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = Provider.of<UserProvider>(context, listen: false).user;
+      if (user != null) {
+        Provider.of<SleepRecordProvider>(
+          context,
+          listen: false,
+        ).fetchRecords(user.id, days: 7);
+      }
+    });
 
     // ✅ Timer that updates _timeLeft every second
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -68,6 +80,24 @@ class _HomePageState extends State<HomePage> {
 
       _updateTimeLeft(); // ✅ initialize timeLeft when loading
     });
+  }
+
+  bool _isSameDate(DateTime date1, DateTime date2) {
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+
+  String _formatDurationDiff(Duration d) {
+    int hours = d.inHours;
+    int minutes = d.inMinutes % 60;
+    return "${hours}시간 ${minutes}분";
+  }
+
+  String _formatSleepDuration(double totalHours) {
+    int hours = totalHours.floor();
+    int minutes = ((totalHours - hours) * 60).round();
+    return "${hours}시간 ${minutes}분";
   }
 
   Future<void> _saveTimes() async {
@@ -121,10 +151,122 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  List<Widget> _buildSleepInfoContent(BuildContext context) {
+    final sleepProvider = Provider.of<SleepRecordProvider>(context);
+    final userProvider = Provider.of<UserProvider>(context);
+    final records = sleepProvider.records;
+
+    // 1. 오늘 날짜와 어제 날짜 구하기
+    final now = DateTime.now();
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final yesterdayDate = todayDate.subtract(const Duration(days: 1));
+
+    // 2. Provider의 records 리스트에서 오늘/어제 기록 찾기
+    // firstWhere를 쓰되, 없으면 null을 반환하도록 orElse 처리 (혹은 try-catch)
+    SleepRecord? todayRecord;
+    SleepRecord? yesterdayRecord;
+
+    try {
+      todayRecord = records.firstWhere(
+        (r) => _isSameDate(r.date, todayDate),
+        // Provider 로직상 데이터가 없으면 empty 객체가 있을 수 있으므로 null 처리는 사실상 불필요할 수 있으나 안전하게 작성
+      );
+    } catch (e) {
+      todayRecord = null;
+    }
+
+    try {
+      yesterdayRecord = records.firstWhere(
+        (r) => _isSameDate(r.date, yesterdayDate),
+      );
+    } catch (e) {
+      yesterdayRecord = null;
+    }
+
+    // 3. 데이터 유효성 검사
+    // SleepRecord.empty()로 생성된 객체는 startTime이 null입니다.
+    // 따라서 startTime이 null이 아니어야 "유효한 데이터"로 봅니다.
+    bool hasTodayData =
+        todayRecord != null &&
+        todayRecord.startTime != null &&
+        todayRecord.totalHours > 0;
+    bool hasYesterdayData =
+        yesterdayRecord != null &&
+        yesterdayRecord.startTime != null &&
+        yesterdayRecord.totalHours > 0;
+
+    // --- CASE 1: 오늘의 데이터가 없는 경우 ---
+    if (!hasTodayData) {
+      return [
+        Text(
+          "${userProvider.user?.nickname ?? "사용자"}님의 오늘 총 수면 시간은",
+          style: const TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          "오늘의 수면 시간이\n업로드가 되지 않았습니다.",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white54,
+          ),
+        ),
+      ];
+    }
+
+    // --- CASE 2: 오늘의 데이터가 있는 경우 (기본 표시) ---
+    List<Widget> content = [
+      Text(
+        "${userProvider.user?.nickname ?? "사용자"}님의 오늘 총 수면 시간은",
+        style: const TextStyle(color: Colors.white70),
+      ),
+      const SizedBox(height: 10),
+      Text(
+        "총 ${_formatSleepDuration(todayRecord!.totalHours)}",
+        style: const TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ),
+    ];
+
+    // --- CASE 3: 어제의 데이터가 있어서 비교가 가능한 경우 ---
+    if (hasYesterdayData) {
+      // double(시간) 차이를 계산
+      double diffHours = todayRecord.totalHours - yesterdayRecord!.totalHours;
+
+      // 계산을 위해 Duration으로 변환
+      int diffInMinutes = (diffHours * 60).round();
+      Duration diffDuration = Duration(minutes: diffInMinutes.abs());
+
+      bool isMore = diffInMinutes >= 0; // 오늘 더 많이 잤거나 같음
+
+      String compareText;
+      if (diffInMinutes == 0) {
+        compareText = "어제와 수면 시간이 같아요.";
+      } else {
+        compareText =
+            "어제보다 ${_formatDurationDiff(diffDuration)} ${isMore ? '더 잤어요!' : '적어요!'}";
+      }
+
+      content.add(const SizedBox(height: 5));
+      content.add(
+        Text(compareText, style: const TextStyle(color: Colors.white70)),
+      );
+    }
+    // 어제 데이터가 없으면 비교 텍스트는 추가되지 않습니다.
+
+    return content;
+  }
+
   @override
   Widget build(BuildContext context) {
     final userProvider = Provider.of<UserProvider>(context);
     final user = userProvider.user;
+
+    final sleepProvider = Provider.of<SleepRecordProvider>(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A202C),
@@ -183,26 +325,15 @@ class _HomePageState extends State<HomePage> {
 
             const SizedBox(height: 20),
 
-            _infoCard([
-              Text(
-                "${user?.nickname ?? "사용자"}님의 오늘 총 수면 시간은",
-                style: TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                "총 5시간 53분",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+            sleepProvider.isLoading
+                ? const SizedBox(
+                  height: 100,
+                  child: Center(child: CircularProgressIndicator()),
+                )
+                : _infoCard(
+                  // 만들어둔 함수를 호출하여 실제 데이터를 넣어줍니다.
+                  _buildSleepInfoContent(context),
                 ),
-              ),
-              const SizedBox(height: 5),
-              const Text(
-                "어제보다 1시간 3분 적어요!",
-                style: TextStyle(color: Colors.white70),
-              ),
-            ]),
 
             const SizedBox(height: 20),
 
