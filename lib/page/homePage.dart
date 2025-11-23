@@ -95,8 +95,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _formatSleepDuration(double totalHours) {
-    int hours = (totalHours / 60).round();
-    int minutes = (totalHours % 60).round();
+    int totalMinutes = totalHours.round();
+    int hours = (totalMinutes / 60).floor();
+    int minutes = (totalMinutes % 60).floor();
     return "${hours}시간 ${minutes}분";
   }
 
