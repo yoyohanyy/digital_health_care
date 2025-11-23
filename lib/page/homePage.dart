@@ -95,8 +95,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   String _formatSleepDuration(double totalHours) {
-    int hours = totalHours.floor();
-    int minutes = ((totalHours - hours) * 60).round();
+    int hours = (totalHours / 60).round();
+    int minutes = (totalHours % 60).round();
     return "${hours}시간 ${minutes}분";
   }
 
@@ -238,7 +238,7 @@ class _HomePageState extends State<HomePage> {
       double diffHours = todayRecord.totalHours - yesterdayRecord!.totalHours;
 
       // 계산을 위해 Duration으로 변환
-      int diffInMinutes = (diffHours * 60).round();
+      int diffInMinutes = diffHours.round();
       Duration diffDuration = Duration(minutes: diffInMinutes.abs());
 
       bool isMore = diffInMinutes >= 0; // 오늘 더 많이 잤거나 같음

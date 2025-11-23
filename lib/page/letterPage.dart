@@ -22,15 +22,28 @@ class _LetterPageState extends State<LetterPage> {
   @override
   void initState() {
     super.initState();
-    _loadLetter(); // 페이지가 시작될 때 저장된 편지 내용을 불러옵니다.
+    _checkAndLoadLetter();
   }
 
   // 편지 내용을 불러오는 함수
-  void _loadLetter() async {
+  void _checkAndLoadLetter() async {
     final prefs = await SharedPreferences.getInstance();
-    // 'letter' 키로 저장된 문자열을 불러옵니다. 없으면 빈 문자열을 사용합니다.
-    final String savedLetter = prefs.getString('letter') ?? '';
-    _controller.text = savedLetter;
+
+    final String? lastSavedDateStr = prefs.getString('lastSavedDate');
+
+    final String todayDateStr = DateTime.now().toString().split(' ')[0];
+
+    if (lastSavedDateStr != null && lastSavedDateStr != todayDateStr) {
+      // 데이터를 초기화합니다.
+      await prefs.remove('letter');
+      await prefs.remove('lastSavedDate');
+      _controller.text = ''; // 화면의 텍스트 필드도 비웁니다.
+      print("날짜가 변경되어 편지 내용이 초기화되었습니다.");
+    } else {
+      // 4. 오늘 저장한 내용이거나 아직 저장된 날짜가 없으면 불러옵니다.
+      final String savedLetter = prefs.getString('letter') ?? '';
+      _controller.text = savedLetter;
+    }
   }
 
   // 편지 내용을 저장하는 함수
@@ -38,6 +51,8 @@ class _LetterPageState extends State<LetterPage> {
     final prefs = await SharedPreferences.getInstance();
     // 'letter'라는 키(key)에 content(편지 내용)를 저장합니다.
     await prefs.setString('letter', content);
+    String todayDateStr = DateTime.now().toString().split(' ')[0];
+    await prefs.setString('lastSavedDate', todayDateStr);
   }
 
   @override
