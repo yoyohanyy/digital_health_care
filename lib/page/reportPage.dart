@@ -415,7 +415,13 @@ class _ReportPageState extends State<ReportPage>
           const SizedBox(height: 20),
           _infoCard([
             const Text("일간 피드백", style: TextStyle(fontSize: 16)),
-          ], height: 80),
+            const SizedBox(height: 8),
+            Text(
+              todayRecord.feedback.isNotEmpty ? todayRecord.feedback : "피드백 없음",
+              style: const TextStyle(fontSize: 14),
+              softWrap: true,     // 자동 줄바꿈
+            ),
+          ]),
 
           const SizedBox(height: 30), // 버튼 위 여백
           ElevatedButton(

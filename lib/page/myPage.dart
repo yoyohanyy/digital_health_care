@@ -76,21 +76,17 @@ class MyPage extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Options
-            _menuTile(context, "건강 데이터 연동하기"),
+            //_menuTile(context, "건강 데이터 연동하기"),
             _menuTile(
               context,
               "카카오 챗봇 연결하기",
               onTap: () => _showChatbotModal(context),
             ),
-            _menuTile(context, "알림 설정?"),
-            _menuTile(context, "앱 정보"),
-            _menuTile(context, "약관 및 정책"),
             _menuTile(
               context,
               "로그아웃",
-              onTap: () => _kakaoService.logout(context),
+              onTap: () => _kakaoService.logout(context), isDestructive: true
             ),
-            _menuTile(context, "탈퇴하기", isDestructive: true),
           ],
         ),
       ),
